@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Victory Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background: #000; color: #fff; font-family: -apple-system, sans-serif; overflow: hidden; height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .player-view { transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); }
+        .lyrics-view { display: none; overflow-y: auto; height: 100%; mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent); }
+        .active-track { color: #ff3b30; }
+        
+        /* シークバーのカスタマイズ */
+        input[type="range"] { -webkit-appearance: none; background: transparent; }
+        input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: #fff; margin-top: -5px; }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <div id="bg-blur" class="fixed inset-0 z-[-1] opacity-40 blur-[80px] scale-150 transition-all duration-1000"></div>
+
+    <main class="flex-1 overflow-y-auto px-5 pt-16 pb-32">
+        <h1 class="text-3xl font-bold mb-6">ライブラリ</h1>
+        
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform">
+                <i class="fas fa-music text-red-500 text-2xl"></i>
+                <span class="font-bold">プレイリスト</span>
+            </div>
+            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform">
+                <i class="fas fa-heart text-pink-500 text-2xl"></i>
+                <span class="font-bold">お気に入り</span>
+            </div>
+        </div>
+
+        <h2 class="text-xl font-bold mb-4 text-white/60">すべての曲</h2>
+        <div id="song-list" class="space-y-1">
+            </div>
+    </main>
+
+    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-40 shadow-2xl" onclick="toggleFullPlayer(true)">
+        <img id="mini-img" src="" class="w-11 h-11 rounded-lg object-cover bg-white/10">
+        <div class="flex-1 ml-3 min-w-0">
+            <div id="mini-title" class="text-sm font-semibold truncate">曲を選択してください</div>
+            <div id="mini-artist" class="text-[11px] text-white/40 truncate">-</div>
+        </div>
+        <div class="flex items-center gap-4 px-2" onclick="event.stopPropagation()">
+            <button onclick="handlePlayPause()" class="w-8 h-8 flex items-center justify-center"><i id="mini-play-btn" class="fas fa-play text-xl"></i></button>
+            <button onclick="handleNext()" class="w-8 h-8 flex items-center justify-center"><i class="fas fa-forward text-lg"></i></button>
+        </div>
+    </div>
+
+    <div id="full-player" class="fixed inset-0 z-[50] player-view translate-y-full bg-black/95 flex flex-col px-8 pb-12 pt-4">
+        <div class="w-full flex justify-center py-4" onclick="toggleFullPlayer(false)">
+            <div class="w-10 h-1.5 bg-white/20 rounded-full"></div>
+        </div>
+
+        <div class="flex-1 flex items-center justify-center overflow-hidden relative">
+            <img id="full-img" src="" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-2xl transition-all duration-500 scale-90">
+            <div id="lyrics-container" class="lyrics-view absolute inset-0 text-center flex flex-col items-center py-10">
+                <p id="lyrics-text" class="text-xl font-bold leading-relaxed whitespace-pre-wrap px-4 text-white/80"></p>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <div class="flex justify-between items-end">
+                <div class="min-w-0">
+                    <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
+                    <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
+                </div>
+                <div class="flex flex-col items-end gap-2">
+                    <button id="btn-loop" onclick="toggleLoopMode()" class="px-4 py-1 rounded-full border border-white/20 text-[10px] font-bold transition-colors">
+                        LOOP MODE
+                    </button>
+                    <button id="btn-turn-end" onclick="triggerTurnEnd()" class="hidden px-4 py-2 bg-red-600 rounded-lg text-xs font-black shadow-lg animate-pulse">
+                        TURN END
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-8">
+            <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
+            <div class="flex justify-between text-[11px] font-bold text-white/30 mt-2">
+                <span id="time-curr">0:00</span>
+                <span id="time-total">0:00</span>
+            </div>
+        </div>
+
+        <div class="flex justify-around items-center mb-10">
+            <button onclick="handlePrev()" class="text-3xl"><i class="fas fa-backward"></i></button>
+            <button onclick="handlePlayPause()" class="text-6xl w-24"><i id="full-play-btn" class="fas fa-play"></i></button>
+            <button onclick="handleNext()" class="text-3xl"><i class="fas fa-forward"></i></button>
+        </div>
+
+        <div class="flex justify-between items-center px-10 text-white/40 text-xl">
+            <button onclick="toggleLyrics()"><i id="lyric-icon" class="fas fa-quote-right"></i></button>
+            <button class="active:text-white"><i class="fas fa-list-ul"></i></button>
+            <button class="active:text-white"><i class="fas fa-share-alt"></i></button>
+        </div>
+    </div>
+
+    <audio id="audio"></audio>
+
+    <script>
+        const tracks = [
+            { 
+                id: 1, title: "必殺仕事人のテーマ", artist: "応援曲・定番", 
+                img: "https://images.unsplash.com/photo-1543326727-cf6c39e8f84c?w=600", color: "#4a1c1c",
+                src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+                lyrics: "（前奏）\nチャチャチャーン！\nさあ、ここからループ！\n（ループ区間：サビ）\n打て打て！ホームラン！",
+                loopStart: 10, loopEnd: 30 // 10秒から30秒の間を無限リピート
+            },
+            { 
+                id: 2, title: "エル・クンバンチェロ", artist: "高校野球・熱風", 
+                img: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600", color: "#1c3a4a",
+                src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+                lyrics: "ア！エ！イ！オ！ウ！\nクンバンチェロ！",
+                loopStart: 5, loopEnd: 25
+            }
+        ];
+
+        let currentIdx = 0;
+        let isLooping = false; // 野球応援ループモード
+        let turnEndFlag = false; // ターンエンド予約
+        const audio = document.getElementById('audio');
+
+        // ライブラリ生成
+        const listContainer = document.getElementById('song-list');
+        tracks.forEach((t, i) => {
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-3 py-3 border-b border-white/5 active:bg-white/5 cursor-pointer";
+            div.onclick = () => playTrack(i);
+            div.innerHTML = `
+                <img src="${t.img}" class="w-10 h-10 rounded object-cover">
+                <span class="text-sm font-medium truncate">${t.title}</span>
+            `;
+            listContainer.appendChild(div);
+        });
+
+        function playTrack(idx) {
+            currentIdx = idx;
+            const t = tracks[idx];
+            audio.src = t.src;
+            
+            // UI更新
+            document.getElementById('mini-title').innerText = t.title;
+            document.getElementById('full-title').innerText = t.title;
+            document.getElementById('mini-artist').innerText = t.artist;
+            document.getElementById('full-artist').innerText = t.artist;
+            document.getElementById('mini-img').src = t.img;
+            document.getElementById('full-img').src = t.img;
+            document.getElementById('lyrics-text').innerText = t.lyrics;
+            document.getElementById('bg-blur').style.background = t.color;
+            
+            // ループ初期化
+            isLooping = false;
+            turnEndFlag = false;
+            updateLoopUI();
+
+            audio.play();
+            updateMediaSession();
+        }
+
+        // 野球応援用：ループ＆ターンエンドロジック
+        audio.ontimeupdate = () => {
+            const t = tracks[currentIdx];
+            if (isLooping && !turnEndFlag) {
+                if (audio.currentTime >= t.loopEnd) {
+                    audio.currentTime = t.loopStart;
+                }
+            }
+            // シークバー更新
+            if (!audio.duration) return;
+            const bar = document.getElementById('seek-bar');
+            bar.max = audio.duration;
+            bar.value = audio.currentTime;
+            document.getElementById('time-curr').innerText = formatTime(audio.currentTime);
+            document.getElementById('time-total').innerText = formatTime(audio.duration);
+        };
+
+        function toggleLoopMode() {
+            isLooping = !isLooping;
+            turnEndFlag = false;
+            updateLoopUI();
+        }
+
+        function triggerTurnEnd() {
+            turnEndFlag = true;
+            document.getElementById('btn-turn-end').innerText = "ENDING...";
+        }
+
+        function updateLoopUI() {
+            const btn = document.getElementById('btn-loop');
+            const turnBtn = document.getElementById('btn-turn-end');
+            btn.className = isLooping ? "px-4 py-1 rounded-full bg-red-500 text-[10px] font-black" : "px-4 py-1 rounded-full border border-white/20 text-[10px] font-bold";
+            turnBtn.classList.toggle('hidden', !isLooping);
+            turnBtn.innerText = "TURN END";
+        }
+
+        // 基本コントロール
+        function handlePlayPause() {
+            if (audio.paused) audio.play(); else audio.pause();
+            const icons = [document.getElementById('mini-play-btn'), document.getElementById('full-play-btn')];
+            const isPaused = audio.paused;
+            icons.forEach(i => i.className = isPaused ? "fas fa-play" : "fas fa-pause");
+            document.getElementById('full-img').style.transform = isPaused ? "scale(0.85)" : "scale(1.0)";
+        }
+
+        function handleNext() { playTrack((currentIdx + 1) % tracks.length); }
+        function handlePrev() { playTrack((currentIdx - 1 + tracks.length) % tracks.length); }
+        function handleSeek(v) { audio.currentTime = v; }
+
+        function toggleFullPlayer(show) {
+            document.getElementById('full-player').style.transform = show ? "translateY(0)" : "translateY(100%)";
+            document.getElementById('mini-player').style.opacity = show ? "0" : "1";
+        }
+
+        function toggleLyrics() {
+            const container = document.getElementById('lyrics-container');
+            const img = document.getElementById('full-img');
+            const icon = document.getElementById('lyric-icon');
+            const isVisible = container.style.display === 'flex';
+            container.style.display = isVisible ? 'none' : 'flex';
+            img.style.opacity = isVisible ? '1' : '0.1';
+            icon.classList.toggle('text-red-500', !isVisible);
+        }
+
+        function formatTime(s) {
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${m}:${sec < 10 ? '0' + sec : sec}`;
+        }
+
+        // バックグラウンド再生設定 (iOS/Android対応)
+        function updateMediaSession() {
+            if ('mediaSession' in navigator) {
+                const t = tracks[currentIdx];
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: t.title,
+                    artist: t.artist,
+                    artwork: [{ src: t.img, sizes: '512x512', type: 'image/png' }]
+                });
+                navigator.mediaSession.setActionHandler('play', () => handlePlayPause());
+                navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
+                navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
+                navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+            }
+        }
+    </script>
+</body>
+</html>
