@@ -32,47 +32,108 @@
             transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); 
         }
 
-        /* シークバーのカスタマイズ */
+        /* --- Apple Music風 モダンシークバー --- */
         .seek-container {
             position: relative;
-            height: 24px;
+            height: 28px; /* タッチしやすい高さを確保 */
             display: flex;
             align-items: center;
+            cursor: pointer;
         }
 
+        /* 背景トラック */
+        .seek-track-bg {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            overflow: hidden;
+            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* 進行状況バー */
+        .seek-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: #fff;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        /* 見えないネイティブスライダー（操作用） */
         input[type="range"] { 
             -webkit-appearance: none; 
             appearance: none; 
             background: transparent; 
             width: 100%;
-            position: relative;
+            height: 100%;
+            position: absolute;
             z-index: 10;
+            margin: 0;
+            cursor: pointer;
         }
-        input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; }
+        input[type="range"]:focus { outline: none; }
+        input[type="range"]::-webkit-slider-runnable-track { 
+            width: 100%; height: 100%; background: transparent; border: none; 
+        }
+        /* ツマミ（丸）を透明にして隠す */
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
             appearance: none; 
-            height: 14px; 
-            width: 14px; 
+            height: 28px; 
+            width: 28px; 
             border-radius: 50%; 
-            background: #fff; 
-            margin-top: -5px; 
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            background: transparent; 
+            cursor: pointer;
         }
 
-        /* シークバー上のループ範囲ビジュアライザー */
+        /* ループ範囲の薄い赤帯 */
         #loop-visual-bar {
             position: absolute;
-            height: 4px;
-            background: #ef4444;
-            border-radius: 2px;
+            height: 6px;
+            background: rgba(239, 68, 68, 0.35); /* Tailwind red-500 薄め */
+            border-radius: 3px;
             z-index: 5;
             top: 50%;
             transform: translateY(-50%);
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.3s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
+
+        /* ループの赤い縦線マーカー */
+        .loop-marker {
+            position: absolute;
+            width: 3px;
+            height: 14px;
+            background: #ef4444; /* Tailwind red-500 */
+            border-radius: 2px;
+            z-index: 6;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        }
+
+        /* 操作時（ドラッグ時）にバーを少し太くする演出 */
+        .seek-container:active .seek-track-bg,
+        .seek-container:active #loop-visual-bar {
+            transform: translateY(-50%) scaleY(1.4);
+        }
+        .seek-container:active .loop-marker {
+            transform: translate(-50%, -50%) scaleY(1.2);
+        }
+        /* --------------------------------- */
 
         .active-song-item {
             background: rgba(255, 255, 255, 0.1);
@@ -167,32 +228,40 @@
         </div>
 
         <!-- アートワークエリア -->
-        <div class="flex-1 flex items-center justify-center overflow-hidden">
+        <div id="full-img-container" class="flex-1 flex items-center justify-center overflow-hidden w-full">
             <img id="full-img" src="" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-2xl transition-all duration-500 scale-90">
         </div>
 
         <!-- タイトルエリア -->
         <div class="mb-6">
-            <div class="flex justify-between items-end">
-                <div class="min-w-0 flex-1">
-                    <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
-                    <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
-                </div>
-                <!-- ループコントロールコンテナ -->
-                <div class="flex items-center gap-2 ml-4">
+            <div class="w-full">
+                <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
+                <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
+            </div>
+            
+            <!-- ループコントロールコンテナ -->
+            <div class="flex items-center justify-between mt-4">
+                <div class="flex items-center gap-2">
                     <button id="btn-loop-toggle" onclick="toggleLoopMode()" class="control-btn">LOOP</button>
                     <button id="btn-loop-start" onclick="setLoopStart()" class="control-btn">START</button>
                     <button id="btn-loop-finish" onclick="setLoopFinish()" class="control-btn">FINISH</button>
                 </div>
+                <!-- ループモードのステータスインジケーター -->
+                <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right">LOOP ACTIVE</div>
             </div>
-            <!-- ループモードのステータスインジケーター -->
-            <div id="loop-indicator" class="text-[9px] text-red-500 font-bold mt-1 opacity-0 transition-opacity">LOOP ACTIVE</div>
         </div>
 
-        <!-- 進捗バー（ループビジュアライザー付き） -->
+        <!-- 進捗バー（モダンUI＆ループビジュアライザー付き） -->
         <div class="mb-8">
             <div class="seek-container">
+                <div class="seek-track-bg">
+                    <div id="seek-progress" class="seek-progress"></div>
+                </div>
                 <div id="loop-visual-bar"></div>
+                <!-- ループの赤い縦線 -->
+                <div id="loop-marker-start" class="loop-marker"></div>
+                <div id="loop-marker-finish" class="loop-marker"></div>
+                
                 <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
             </div>
             <div class="flex justify-between text-[11px] font-bold text-white/30 mt-2">
@@ -209,7 +278,7 @@
         </div>
 
         <!-- フッターアクション -->
-        <div class="flex justify-around items-center px-4 text-white/40 text-xl mb-4">
+        <div id="full-footer" class="flex justify-around items-center px-4 text-white/40 text-xl mb-4 h-16 w-full">
             <button id="btn-queue-toggle" onclick="onQueueButtonClick()" class="footer-icon-btn">
                 <i class="fas fa-list-ul"></i>
             </button>
@@ -220,14 +289,23 @@
     </div>
 
     <!-- キュー（再生リスト）画面 -->
-    <div id="queue-view" class="fixed inset-0 z-[60] player-view translate-y-full bg-black/95 flex flex-col pt-12 pb-8 px-4 backdrop-blur-3xl">
-        <div class="flex justify-between items-center mb-6 px-2">
-            <h2 class="text-2xl font-bold">次に再生</h2>
-            <button onclick="toggleQueueView(false)" class="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full active:scale-90 transition-transform">
+    <div id="queue-view" class="fixed inset-0 z-[60] player-view translate-y-full bg-black/95 flex flex-col backdrop-blur-3xl">
+        <!-- キュー画面用上部ミニプレイヤー (タップでフルプレーヤーへ戻る) -->
+        <div id="queue-mini-player" class="h-16 flex items-center px-4 bg-white/10 shrink-0 cursor-pointer active:bg-white/20 transition-colors" onclick="toggleQueueView(false)">
+            <img id="queue-mini-img" src="" class="w-10 h-10 rounded object-cover">
+            <div class="flex-1 ml-3 min-w-0">
+                <div id="queue-mini-title" class="text-sm font-semibold truncate">曲名</div>
+                <div id="queue-mini-artist" class="text-[11px] text-white/40 truncate">アーティスト</div>
+            </div>
+            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
                 <i class="fas fa-chevron-down text-sm"></i>
-            </button>
+            </div>
         </div>
-        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 pb-10">
+
+        <div class="flex justify-between items-center mb-4 px-6 pt-6 shrink-0">
+            <h2 class="text-2xl font-bold">次に再生</h2>
+        </div>
+        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 px-4 pb-10">
             <!-- 動的に生成されます -->
         </div>
     </div>
@@ -284,12 +362,10 @@
 
         function onLyricsButtonClick() { console.log("Lyrics feature"); }
         
-        // キュー（リスト）ボタンのクリックイベント
         function onQueueButtonClick() { 
             toggleQueueView(true);
         }
 
-        // キュー画面の表示・非表示を切り替える
         function toggleQueueView(show) {
             const queueView = document.getElementById('queue-view');
             const queueBtn = document.getElementById('btn-queue-toggle');
@@ -297,16 +373,19 @@
             if (show) {
                 renderQueueList();
                 queueView.style.transform = "translateY(0)";
-                queueBtn.classList.add('text-white');
-                queueBtn.classList.remove('text-white/40');
+                if(queueBtn) {
+                    queueBtn.classList.add('text-white');
+                    queueBtn.classList.remove('text-white/40');
+                }
             } else {
                 queueView.style.transform = "translateY(100%)";
-                queueBtn.classList.remove('text-white');
-                queueBtn.classList.add('text-white/40');
+                if(queueBtn) {
+                    queueBtn.classList.remove('text-white');
+                    queueBtn.classList.add('text-white/40');
+                }
             }
         }
 
-        // キューリストのレンダリング
         function renderQueueList() {
             const container = document.getElementById('queue-list');
             container.innerHTML = '';
@@ -316,7 +395,6 @@
                 const div = document.createElement('div');
                 div.id = `queue-item-${i}`;
                 
-                // 再生中の曲はハイライトする
                 div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${
                     isActive 
                     ? 'bg-white/10 border-l-4 border-red-500' 
@@ -325,8 +403,7 @@
                 
                 div.onclick = () => {
                     playTrack(i);
-                    // 曲を選択した時にキュー画面を自動で閉じる
-                    toggleQueueView(false);
+                    // ここで自動で閉じないように toggleQueueView(false) を削除
                 };
                 
                 div.innerHTML = `
@@ -346,7 +423,6 @@
                 container.appendChild(div);
             });
 
-            // 現在再生中の曲までスクロールさせる
             if (currentIdx !== -1) {
                 setTimeout(() => {
                     const activeItem = document.getElementById(`queue-item-${currentIdx}`);
@@ -382,7 +458,6 @@
         function playTrack(idx) {
             if (idx === currentIdx && !audio.paused) return;
             
-            // 以前の曲のハイライトを削除
             if (currentIdx !== -1) {
                 const prevSongItem = document.getElementById(`song-item-${currentIdx}`);
                 if (prevSongItem) prevSongItem.classList.remove('active-song-item');
@@ -392,7 +467,6 @@
             const t = tracks[idx];
             audio.src = t.src;
             
-            // 新しい曲のハイライトを追加
             const newSongItem = document.getElementById(`song-item-${idx}`);
             if (newSongItem) newSongItem.classList.add('active-song-item');
             
@@ -404,12 +478,20 @@
             document.getElementById('full-img').src = t.img;
             document.getElementById('bg-blur').style.backgroundColor = t.color;
             
-            resetLoopState(); // 曲が変わったらループ解除
+            // キュー画面上部のミニプレイヤーも更新
+            document.getElementById('queue-mini-title').innerText = t.title;
+            document.getElementById('queue-mini-artist').innerText = t.artist;
+            document.getElementById('queue-mini-img').src = t.img;
+            
+            // シークバーの表示をリセット
+            document.getElementById('seek-progress').style.width = '0%';
+            document.getElementById('seek-bar').value = 0;
+
+            resetLoopState(); 
             audio.play();
             updateMediaSession();
             updatePlayButtonIcons();
 
-            // キュー画面が開いている場合は再描画してハイライトを更新
             const queueView = document.getElementById('queue-view');
             if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
                 renderQueueList();
@@ -427,7 +509,6 @@
             if (loopStartTime === null) loopStartTime = 0;
             loopFinishTime = audio.currentTime;
             isLooping = true;
-            // FinishがStartより前なら入れ替える
             if (loopFinishTime < loopStartTime) {
                 [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime];
             }
@@ -456,6 +537,8 @@
             const btnFinish = document.getElementById('btn-loop-finish');
             const indicator = document.getElementById('loop-indicator');
             const visualBar = document.getElementById('loop-visual-bar');
+            const markerStart = document.getElementById('loop-marker-start');
+            const markerFinish = document.getElementById('loop-marker-finish');
 
             btnToggle.classList.toggle('active', isLooping);
             btnStart.classList.toggle('active', loopStartTime !== null);
@@ -463,42 +546,67 @@
 
             if (isLooping) {
                 indicator.style.opacity = "1";
+                updateLoopVisualBar(); // マーカーとバーの配置更新
                 if (loopStartTime !== null && loopFinishTime !== null) {
                     indicator.innerText = "A-B LOOP ACTIVE";
-                    updateLoopVisualBar();
-                    visualBar.style.opacity = "1";
                 } else {
                     indicator.innerText = "SINGLE TRACK LOOP ACTIVE";
-                    visualBar.style.opacity = "0";
                 }
             } else {
                 indicator.style.opacity = "0";
                 visualBar.style.opacity = "0";
+                markerStart.style.opacity = "0";
+                markerFinish.style.opacity = "0";
             }
         }
 
         function updateLoopVisualBar() {
             const visualBar = document.getElementById('loop-visual-bar');
-            if (loopStartTime !== null && loopFinishTime !== null && audio.duration) {
-                const startPercent = (loopStartTime / audio.duration) * 100;
-                const endPercent = (loopFinishTime / audio.duration) * 100;
-                visualBar.style.left = startPercent + "%";
-                visualBar.style.width = (endPercent - startPercent) + "%";
+            const markerStart = document.getElementById('loop-marker-start');
+            const markerFinish = document.getElementById('loop-marker-finish');
+
+            if (audio.duration) {
+                // START マーカー表示
+                if (loopStartTime !== null) {
+                    const startPercent = (loopStartTime / audio.duration) * 100;
+                    markerStart.style.left = startPercent + "%";
+                    markerStart.style.opacity = "1";
+                } else {
+                    markerStart.style.opacity = "0";
+                }
+
+                // FINISH マーカー表示
+                if (loopFinishTime !== null) {
+                    const endPercent = (loopFinishTime / audio.duration) * 100;
+                    markerFinish.style.left = endPercent + "%";
+                    markerFinish.style.opacity = "1";
+                } else {
+                    markerFinish.style.opacity = "0";
+                }
+
+                // 範囲の赤い帯表示
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    const startPercent = (loopStartTime / audio.duration) * 100;
+                    const endPercent = (loopFinishTime / audio.duration) * 100;
+                    visualBar.style.left = startPercent + "%";
+                    visualBar.style.width = (endPercent - startPercent) + "%";
+                    visualBar.style.opacity = "1";
+                } else {
+                    visualBar.style.opacity = "0";
+                }
             }
         }
 
         audio.ontimeupdate = () => {
             if (currentIdx === -1) return;
             
-            // ループ制御ロジック
+            // ループ制御
             if (isLooping) {
                 if (loopStartTime !== null && loopFinishTime !== null) {
-                    // A-Bループ
                     if (audio.currentTime >= loopFinishTime) {
                         audio.currentTime = loopStartTime;
                     }
                 } else {
-                    // 1曲ループ（START/FINISHが両方設定されていない場合）
                     if (audio.currentTime >= audio.duration - 0.2) {
                         audio.currentTime = 0;
                         audio.play();
@@ -510,12 +618,16 @@
                 const bar = document.getElementById('seek-bar');
                 bar.max = audio.duration;
                 bar.value = audio.currentTime;
+                
+                // モダンプログレスバーの進捗表示更新
+                const progressPercent = (audio.currentTime / audio.duration) * 100;
+                document.getElementById('seek-progress').style.width = progressPercent + '%';
+
                 document.getElementById('time-curr').innerText = formatTime(audio.currentTime);
                 document.getElementById('time-total').innerText = formatTime(audio.duration);
                 
-                if (isLooping && loopStartTime !== null && loopFinishTime !== null) {
-                    updateLoopVisualBar();
-                }
+                // 動的な更新が必要な場合（ロード直後など）
+                if (isLooping) updateLoopVisualBar();
             }
         };
 
@@ -544,9 +656,30 @@
             document.getElementById('full-img').style.transform = isPaused ? "scale(0.85)" : "scale(1.0)";
         }
 
-        function handleNext() { playTrack((currentIdx + 1) % tracks.length); }
-        function handlePrev() { playTrack((currentIdx - 1 + tracks.length) % tracks.length); }
-        function handleSeek(v) { audio.currentTime = v; }
+        function handleNext() { 
+            playTrack((currentIdx + 1) % tracks.length); 
+        }
+        
+        // 巻き戻しボタンの挙動を変更
+        function handlePrev() { 
+            if (currentIdx === -1) return;
+            
+            // 再生時間が5秒以上の場合は曲の先頭に戻る
+            if (audio.currentTime >= 5.0) {
+                audio.currentTime = 0;
+            } else {
+                // 5秒未満の場合は前の曲に戻る
+                playTrack((currentIdx - 1 + tracks.length) % tracks.length); 
+            }
+        }
+        
+        function handleSeek(v) { 
+            audio.currentTime = v; 
+            if (!isNaN(audio.duration)) {
+                const progressPercent = (v / audio.duration) * 100;
+                document.getElementById('seek-progress').style.width = progressPercent + '%';
+            }
+        }
 
         function toggleFullPlayer(show) {
             const player = document.getElementById('full-player');
@@ -563,6 +696,91 @@
             return `${m}:${sec < 10 ? '0' + sec : sec}`;
         }
 
+        // スワイプイベントの設定
+        function setupSwipeEvents() {
+            function addSwipeListener(element, options) {
+                let startX = 0;
+                let startY = 0;
+                let isTouching = false;
+
+                element.addEventListener('touchstart', e => {
+                    // シークバーやボタン上のスワイプは無視する
+                    let target = e.target;
+                    while (target && target !== element) {
+                        if (target.tagName.toLowerCase() === 'button' || target.tagName.toLowerCase() === 'input') {
+                            return;
+                        }
+                        target = target.parentNode;
+                    }
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    isTouching = true;
+                }, { passive: true });
+
+                element.addEventListener('touchend', e => {
+                    if (!isTouching) return;
+                    isTouching = false;
+                    
+                    let endX = e.changedTouches[0].clientX;
+                    let endY = e.changedTouches[0].clientY;
+                    
+                    let diffX = endX - startX;
+                    let diffY = endY - startY;
+                    
+                    let absDiffX = Math.abs(diffX);
+                    let absDiffY = Math.abs(diffY);
+                    
+                    const threshold = 40; // スワイプ判定のしきい値
+                    
+                    if (Math.max(absDiffX, absDiffY) > threshold) {
+                        if (absDiffX > absDiffY) {
+                            // 横方向のスワイプ
+                            if (diffX > 0 && options.onSwipeRight) options.onSwipeRight();
+                            else if (diffX < 0 && options.onSwipeLeft) options.onSwipeLeft();
+                        } else {
+                            // 縦方向のスワイプ
+                            if (diffY > 0 && options.onSwipeDown) options.onSwipeDown();
+                            else if (diffY < 0 && options.onSwipeUp) options.onSwipeUp();
+                        }
+                    }
+                });
+            }
+
+            // 1. 画面下部を上にスワイプでリスト表示
+            const fullFooter = document.getElementById('full-footer');
+            if (fullFooter) {
+                addSwipeListener(fullFooter, {
+                    onSwipeUp: () => toggleQueueView(true)
+                });
+            }
+
+            // 2. フルプレーヤーを上から下にスワイプでミニプレイヤー化
+            const fullPlayer = document.getElementById('full-player');
+            if (fullPlayer) {
+                addSwipeListener(fullPlayer, {
+                    onSwipeDown: () => toggleFullPlayer(false)
+                });
+            }
+
+            // 3. アートワーク(img)を右スワイプで次、左スワイプで前
+            const fullImgContainer = document.getElementById('full-img-container');
+            if (fullImgContainer) {
+                addSwipeListener(fullImgContainer, {
+                    onSwipeRight: () => handleNext(),
+                    onSwipeLeft: () => handlePrev()
+                });
+            }
+
+            // 4. ミニプレイヤーを右スワイプで次、左スワイプで前
+            const miniPlayer = document.getElementById('mini-player');
+            if (miniPlayer) {
+                addSwipeListener(miniPlayer, {
+                    onSwipeRight: () => handleNext(),
+                    onSwipeLeft: () => handlePrev()
+                });
+            }
+        }
+
         function updateMediaSession() {
             if ('mediaSession' in navigator) {
                 const t = tracks[currentIdx];
@@ -573,21 +791,23 @@
                 });
                 navigator.mediaSession.setActionHandler('play', () => handlePlayPause());
                 navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
-        navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
-        navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
-    }
-}
+                navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
+                navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+            }
+        }
 
-// PWA: Service Worker の登録
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('Service Worker 登録成功:', reg.scope))
-            .catch(err => console.log('Service Worker 登録失敗:', err));
-    });
-}
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker 登録成功:', reg.scope))
+                    .catch(err => console.log('Service Worker 登録失敗:', err));
+            });
+        }
 
-window.onload = initLibrary;
-</script>
+        window.onload = () => {
+            initLibrary();
+            setupSwipeEvents();
+        };
+    </script>
 </body>
 </html>
