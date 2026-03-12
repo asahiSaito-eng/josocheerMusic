@@ -5,175 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Jmusic</title>
     
-    <!-- PWA用設定 -->
     <meta name="theme-color" content="#000000">
     <link rel="apple-touch-icon" href="img/iconcheer.png">
     <link rel="manifest" href="manifest.json">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    
     <style>
-        body { 
-            background: #000; 
-            color: #fff; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            overflow: hidden; 
-            height: 100vh; 
-        }
+        body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow: hidden; height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .player-view { transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); }
         
-        .glass { 
-            background: rgba(255, 255, 255, 0.1); 
-            backdrop-filter: blur(20px); 
-            -webkit-backdrop-filter: blur(20px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-        }
-        
-        .player-view { 
-            transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); 
-        }
-
-        /* --- Apple Music風 モダンシークバー --- */
-        .seek-container {
-            position: relative;
-            height: 28px;
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-
-        .seek-track-bg {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            overflow: hidden;
-            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-        }
-
-        .seek-progress {
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 0%;
-            background: #fff;
-            border-radius: 4px;
-            pointer-events: none;
-        }
-
-        input[type="range"] { 
-            -webkit-appearance: none; 
-            appearance: none; 
-            background: transparent; 
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            z-index: 10;
-            margin: 0;
-            cursor: pointer;
-        }
+        .seek-container { position: relative; height: 28px; display: flex; align-items: center; cursor: pointer; }
+        .seek-track-bg { position: absolute; left: 0; right: 0; height: 6px; background: rgba(255, 255, 255, 0.2); border-radius: 4px; top: 50%; transform: translateY(-50%); pointer-events: none; overflow: hidden; transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+        .seek-progress { position: absolute; left: 0; top: 0; bottom: 0; width: 0%; background: #fff; border-radius: 4px; pointer-events: none; }
+        input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; width: 100%; height: 100%; position: absolute; z-index: 10; margin: 0; cursor: pointer; }
         input[type="range"]:focus { outline: none; }
-        input[type="range"]::-webkit-slider-runnable-track { 
-            width: 100%; height: 100%; background: transparent; border: none; 
-        }
-        input[type="range"]::-webkit-slider-thumb { 
-            -webkit-appearance: none; 
-            appearance: none; 
-            height: 28px; 
-            width: 28px; 
-            border-radius: 50%; 
-            background: transparent; 
+        input[type="range"]::-webkit-slider-runnable-track { width: 100%; height: 100%; background: transparent; border: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; height: 28px; width: 28px; border-radius: 50%; background: transparent; cursor: pointer; }
+
+        #loop-visual-bar { position: absolute; height: 6px; background: rgba(239, 68, 68, 0.35); border-radius: 3px; z-index: 5; top: 50%; transform: translateY(-50%); pointer-events: none; opacity: 0; transition: opacity 0.3s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+        .loop-marker { position: absolute; width: 3px; height: 14px; background: #ef4444; border-radius: 2px; z-index: 6; top: 50%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; transition: opacity 0.3s ease, transform 0.2s ease; box-shadow: 0 0 6px rgba(0,0,0,0.6); }
+
+        .seek-container:active .seek-track-bg, .seek-container:active #loop-visual-bar { transform: translateY(-50%) scaleY(1.4); }
+        .seek-container:active .loop-marker { transform: translate(-50%, -50%) scaleY(1.2); }
+
+        .active-song-item { background: rgba(255, 255, 255, 0.1); border-left: 3px solid #ef4444; }
+        .footer-icon-btn { transition: all 0.2s ease; cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
+        .footer-icon-btn:active { transform: scale(0.9); opacity: 0.6; }
+
+        .control-btn { padding: 6px 14px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 0.05em; }
+        .control-btn.active { background: #fff; color: #000; border-color: #fff; }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .sortable-ghost { opacity: 0.4; background: rgba(255,255,255,0.1); }
+        .sortable-drag { background: #18181b; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5); z-index: 50; }
+        
+        .slide-out-left { transform: translateX(-100%); opacity: 0; }
+        
+        .modal-enter { opacity: 1 !important; pointer-events: auto !important; }
+        .modal-enter .modal-content { transform: scale(1) !important; }
+
+        /* Apple Music風 歌詞スタイル */
+        .lyric-line {
+            font-size: 1.75rem;
+            line-height: 1.4;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.35);
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform-origin: left center;
             cursor: pointer;
+            padding: 8px 0;
+            filter: blur(1px);
         }
-
-        #loop-visual-bar {
-            position: absolute;
-            height: 6px;
-            background: rgba(239, 68, 68, 0.35);
-            border-radius: 3px;
-            z-index: 5;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        .lyric-line:active {
+            opacity: 0.7;
         }
-
-        .loop-marker {
-            position: absolute;
-            width: 3px;
-            height: 14px;
-            background: #ef4444;
-            border-radius: 2px;
-            z-index: 6;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s ease, transform 0.2s ease;
-            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        .lyric-active {
+            color: rgba(255, 255, 255, 1);
+            transform: scale(1.05);
+            filter: blur(0px);
+            text-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
-
-        .seek-container:active .seek-track-bg,
-        .seek-container:active #loop-visual-bar {
-            transform: translateY(-50%) scaleY(1.4);
-        }
-        .seek-container:active .loop-marker {
-            transform: translate(-50%, -50%) scaleY(1.2);
-        }
-
-        .active-song-item {
-            background: rgba(255, 255, 255, 0.1);
-            border-left: 3px solid #ef4444;
-        }
-
-        .footer-icon-btn {
-            transition: all 0.2s ease;
-            cursor: pointer;
-            width: 44px;
-            height: 44px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .footer-icon-btn:active {
-            transform: scale(0.9);
-            opacity: 0.6;
-        }
-
-        .control-btn {
-            padding: 6px 14px;
-            border-radius: 999px;
-            font-size: 10px;
-            font-weight: 800;
-            border: 1px solid rgba(255,255,255,0.2);
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .control-btn.active {
-            background: #fff;
-            color: #000;
-            border-color: #fff;
-        }
-
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
+        /* 歌詞ビューの背景ぼかし（フルプレイヤーの背景を透かせるため） */
+        #lyrics-view {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
         }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <!-- 背景のぼかし -->
+    <!-- 共通のダイナミックな背景（フルプレイヤー＆歌詞用） -->
     <div id="bg-blur" class="fixed inset-0 z-[-1] opacity-40 blur-[80px] scale-150 transition-all duration-1000"></div>
 
     <!-- ライブラリ画面 -->
@@ -181,58 +89,193 @@
         <h1 class="text-3xl font-bold mb-6">ライブラリ</h1>
         
         <div class="grid grid-cols-2 gap-4 mb-8">
-            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
+            <div onclick="openView('view-playlists')" class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
                 <i class="fas fa-music text-red-500 text-2xl"></i>
                 <span class="font-bold">プレイリスト</span>
             </div>
-            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
+            <div onclick="openView('view-favorites')" class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
                 <i class="fas fa-heart text-pink-500 text-2xl"></i>
                 <span class="font-bold">お気に入り</span>
             </div>
         </div>
 
         <h2 class="text-xl font-bold mb-4 text-white/60">すべての曲</h2>
-        <div id="song-list" class="space-y-1">
-            <!-- 動的に生成されます -->
-        </div>
+        <div id="song-list" class="space-y-1"></div>
     </main>
 
-    <!-- ミニプレーヤー -->
-    <!-- クリックイベントを専用の関数に変更し、スワイプ誤動作を防止 -->
-    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-40 shadow-2xl transition-opacity duration-300" onclick="handleMiniPlayerClick()">
-        <img id="mini-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&h=100&fit=crop" class="w-11 h-11 rounded-lg object-cover bg-white/10" alt="cover">
-        <div class="flex-1 ml-3 min-w-0">
-            <div id="mini-title" class="text-sm font-semibold truncate">曲を選択してください</div>
-            <div id="mini-artist" class="text-[11px] text-white/40 truncate">-</div>
+    <!-- お気に入り画面 -->
+    <div id="view-favorites" class="fixed inset-0 z-[45] bg-black flex flex-col transition-transform translate-x-full duration-300">
+        <div class="flex items-center justify-between px-4 h-16 shrink-0 bg-black/80 backdrop-blur-md sticky top-0 z-10">
+            <button onclick="closeView('view-favorites')" class="text-red-500 font-semibold flex items-center gap-1 w-20"><i class="fas fa-chevron-left"></i> 戻る</button>
+            <h2 class="font-bold text-lg">お気に入り</h2>
+            <div class="w-20"></div>
         </div>
-        <div class="flex items-center gap-4 px-2" onclick="event.stopPropagation()">
+        <div id="favorites-list" class="flex-1 overflow-y-auto px-4 pb-24 space-y-1"></div>
+    </div>
+
+    <!-- プレイリスト一覧画面 -->
+    <div id="view-playlists" class="fixed inset-0 z-[45] bg-black flex flex-col transition-transform translate-x-full duration-300">
+        <div class="flex items-center justify-between px-4 h-16 shrink-0 bg-black/80 backdrop-blur-md sticky top-0 z-10">
+            <button onclick="closeView('view-playlists')" class="text-red-500 font-semibold flex items-center gap-1 w-20"><i class="fas fa-chevron-left"></i> 戻る</button>
+            <h2 class="font-bold text-lg">プレイリスト</h2>
+            <div class="w-20"></div>
+        </div>
+        <div class="px-5 mb-6 mt-2">
+            <button onclick="createNewPlaylist()" class="w-full py-3 bg-red-500/20 text-red-500 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform">
+                <i class="fas fa-plus"></i> 新規プレイリスト
+            </button>
+        </div>
+        <div id="playlists-list" class="flex-1 overflow-y-auto px-5 pb-24 grid grid-cols-2 gap-4 place-content-start"></div>
+    </div>
+
+    <!-- プレイリスト詳細画面 -->
+    <div id="view-playlist-detail" class="fixed inset-0 z-[46] bg-black flex flex-col transition-transform translate-x-full duration-300">
+        <div class="flex items-center justify-between px-4 h-16 shrink-0 bg-black/80 backdrop-blur-md sticky top-0 z-10">
+            <button onclick="closeView('view-playlist-detail')" class="text-red-500 font-semibold flex items-center gap-1 w-20"><i class="fas fa-chevron-left"></i> 戻る</button>
+            <button id="btn-playlist-edit" onclick="togglePlaylistEdit()" class="text-red-500 font-semibold w-20 text-right text-sm">編集</button>
+        </div>
+        <div class="flex-1 overflow-y-auto pb-24">
+            <div class="px-6 py-4 flex flex-col items-center">
+                <div id="detail-cover-container" class="relative w-48 h-48 bg-white/10 rounded-2xl shadow-2xl mb-6 flex items-center justify-center overflow-hidden cursor-default transition-all" onclick="handlePlaylistCoverTap()">
+                    <div id="detail-cover-inner" class="w-full h-full flex items-center justify-center">
+                        <i class="fas fa-music text-6xl text-white/20"></i>
+                    </div>
+                    <div id="detail-cover-edit-overlay" class="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 transition-opacity pointer-events-none">
+                        <i class="fas fa-camera text-3xl text-white mb-2"></i>
+                        <span class="text-xs font-bold text-white shadow-sm">画像を変更</span>
+                    </div>
+                </div>
+                <input type="file" id="edit-playlist-cover-input" accept="image/*" class="hidden" onchange="processImageSelection(event, updateCurrentPlaylistCover)">
+                
+                <h1 id="detail-playlist-title" class="text-2xl font-bold mb-2 text-center px-4 w-full truncate">Playlist Name</h1>
+                <div class="flex gap-4 w-full mt-4" id="playlist-controls">
+                    <button onclick="playPlaylist()" class="flex-1 bg-white/10 py-3 rounded-xl font-bold flex justify-center items-center gap-2 active:bg-white/20 transition-colors">
+                        <i class="fas fa-play"></i> 再生
+                    </button>
+                    <button onclick="openTrackSelector()" class="flex-1 bg-white/10 py-3 rounded-xl font-bold flex justify-center items-center gap-2 active:bg-white/20 transition-colors text-red-500">
+                        <i class="fas fa-plus"></i> 曲を追加
+                    </button>
+                </div>
+            </div>
+            <div id="playlist-detail-list" class="space-y-0 mt-4 overflow-x-hidden"></div>
+        </div>
+    </div>
+
+    <!-- 中央配置モーダル群 -->
+    <div id="modal-new-playlist" class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('modal-new-playlist')"></div>
+        <div class="modal-content bg-zinc-800 rounded-2xl w-[85%] max-w-sm p-6 relative z-10 transform scale-95 transition-transform duration-300 flex flex-col items-center shadow-2xl border border-white/10">
+            <h3 class="font-bold text-lg mb-4">新規プレイリスト</h3>
+            <div class="relative w-32 h-32 mb-4 group cursor-pointer" onclick="document.getElementById('new-playlist-cover-input').click()">
+                <img id="new-playlist-cover-preview" src="" class="absolute inset-0 w-full h-full object-cover rounded-xl shadow-lg hidden">
+                <div id="new-playlist-cover-placeholder" class="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/10 shadow-lg border-2 border-dashed border-white/20">
+                    <i class="fas fa-camera text-2xl text-white/50 mb-1"></i>
+                    <span class="text-xs text-white/50">画像を選択</span>
+                </div>
+            </div>
+            <input type="file" id="new-playlist-cover-input" accept="image/*" class="hidden" onchange="processImageSelection(event, setTempNewPlaylistCover)">
+            <input type="text" id="new-playlist-name" placeholder="プレイリスト名" class="w-full bg-black/30 border border-white/20 rounded-xl px-4 py-3 text-white mb-6 focus:outline-none focus:border-red-500 focus:bg-black/60 text-center transition-colors">
+            <div class="flex w-full gap-3">
+                <button onclick="closeModal('modal-new-playlist')" class="flex-1 py-3 rounded-xl bg-white/10 font-bold active:bg-white/20 transition-colors">キャンセル</button>
+                <button onclick="submitNewPlaylist()" class="flex-1 py-3 rounded-xl bg-red-500 font-bold text-white active:bg-red-600 transition-colors shadow-lg shadow-red-500/30">作成</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-delete-playlist" class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('modal-delete-playlist')"></div>
+        <div class="modal-content bg-zinc-800 rounded-2xl w-[85%] max-w-sm p-6 relative z-10 transform scale-95 transition-transform duration-300 flex flex-col items-center shadow-2xl border border-white/10">
+            <h3 class="font-bold text-lg mb-2">プレイリストの削除</h3>
+            <p class="text-white/70 text-sm text-center mb-6">このプレイリストを削除してもよろしいですか？この操作は取り消せません。</p>
+            <div class="flex w-full gap-3">
+                <button onclick="closeModal('modal-delete-playlist')" class="flex-1 py-3 rounded-xl bg-white/10 font-bold active:bg-white/20 transition-colors">キャンセル</button>
+                <button onclick="confirmDeletePlaylist()" class="flex-1 py-3 rounded-xl bg-red-500 font-bold text-white active:bg-red-600 transition-colors shadow-lg shadow-red-500/30">削除</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-track-options" class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('modal-track-options')"></div>
+        <div class="modal-content bg-zinc-800 rounded-2xl w-[85%] max-w-sm p-6 relative z-10 transform scale-95 transition-transform duration-300 flex flex-col gap-2 shadow-2xl border border-white/10">
+            <div class="flex items-center gap-4 pb-4 border-b border-white/10 mb-2">
+                <img id="opt-img" src="" class="w-12 h-12 rounded object-cover shadow">
+                <div class="flex-1 min-w-0">
+                    <div id="opt-title" class="font-bold truncate">Title</div>
+                    <div id="opt-artist" class="text-xs text-white/50 truncate">Artist</div>
+                </div>
+            </div>
+            <button onclick="optToggleFavorite()" class="flex items-center gap-4 py-3 active:bg-white/5 rounded-xl px-2 transition-colors">
+                <i id="opt-fav-icon" class="far fa-heart text-xl w-6 text-center"></i>
+                <span id="opt-fav-text" class="font-semibold text-base">お気に入りに追加</span>
+            </button>
+            <button onclick="optAddToPlaylist()" class="flex items-center gap-4 py-3 active:bg-white/5 rounded-xl px-2 transition-colors">
+                <i class="fas fa-list text-xl w-6 text-center text-white/70"></i>
+                <span class="font-semibold text-base">プレイリストに追加...</span>
+            </button>
+            <div class="mt-2 pt-2 border-t border-white/10">
+                <button onclick="closeModal('modal-track-options')" class="w-full py-3 font-bold text-white/60 active:text-white transition-colors">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-playlist-select" class="fixed inset-0 z-[105] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeModal('modal-playlist-select')"></div>
+        <div class="modal-content bg-zinc-800 rounded-2xl w-[85%] max-w-sm p-6 relative z-10 transform scale-95 transition-transform duration-300 flex flex-col shadow-2xl border border-white/10 max-h-[70vh]">
+            <h3 class="font-bold text-lg mb-4 text-center">プレイリストに追加</h3>
+            <div id="select-playlist-list" class="flex-1 overflow-y-auto space-y-1 mb-4 hide-scrollbar"></div>
+            <button onclick="closeModal('modal-playlist-select')" class="w-full py-3 rounded-xl bg-white/10 font-bold active:bg-white/20 transition-colors">キャンセル</button>
+        </div>
+    </div>
+
+    <div id="modal-track-selector" class="fixed inset-0 z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-md" onclick="saveTrackSelection()"></div>
+        <div class="modal-content bg-zinc-900 rounded-2xl w-[90%] h-[80vh] relative z-10 transform scale-95 transition-transform duration-300 flex flex-col shadow-2xl border border-white/10 overflow-hidden">
+            <div class="flex items-center justify-between px-4 h-14 shrink-0 bg-zinc-800/50 border-b border-white/10">
+                <button onclick="closeModal('modal-track-selector')" class="text-white font-semibold w-16 text-left text-sm">ｷｬﾝｾﾙ</button>
+                <h2 class="font-bold text-md">曲を追加</h2>
+                <button onclick="saveTrackSelection()" class="text-red-500 font-bold w-16 text-right text-sm">完了</button>
+            </div>
+            <div id="selector-track-list" class="flex-1 overflow-y-auto px-4 py-2 space-y-1 hide-scrollbar"></div>
+        </div>
+    </div>
+
+    <!-- ミニプレイヤー -->
+    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-40 shadow-2xl transition-opacity duration-300" onclick="handleMiniPlayerClick()">
+        <div id="mini-swipe-area" class="flex-1 h-full flex items-center overflow-hidden mr-2 relative cursor-pointer">
+            <div id="mini-content-wrapper" class="flex items-center w-full">
+                <img id="mini-img" src="img/iconcheer.png" class="w-11 h-11 rounded-lg object-cover bg-white/10 shrink-0" alt="cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
+                <div class="flex-1 ml-3 min-w-0">
+                    <div id="mini-title" class="text-sm font-semibold truncate">曲を選択してください</div>
+                    <div id="mini-artist" class="text-[11px] text-white/40 truncate">-</div>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-4 px-2 shrink-0" onclick="event.stopPropagation()">
             <button onclick="handlePlayPause()" class="w-8 h-8 flex items-center justify-center"><i id="mini-play-btn" class="fas fa-play text-xl"></i></button>
             <button onclick="forceNextTrack()" class="w-8 h-8 flex items-center justify-center"><i class="fas fa-forward text-lg"></i></button>
         </div>
     </div>
 
-    <!-- フルプレーヤー画面 -->
-    <!-- 下部パディングを縮小 (pb-12 -> pb-4) -->
-    <div id="full-player" class="fixed inset-0 z-[50] player-view translate-y-full bg-black/95 flex flex-col px-8 pb-4 pt-4">
-        <!-- 閉じるハンドル -->
-        <div class="w-full flex justify-center py-4" onclick="toggleFullPlayer(false)">
-            <div class="w-10 h-1.5 bg-white/20 rounded-full"></div>
+    <!-- フルプレイヤー画面 -->
+    <div id="full-player" class="fixed inset-0 z-[50] player-view translate-y-full flex flex-col px-8 pb-4 pt-4 overflow-hidden">
+        <div class="absolute inset-0 bg-black z-[-3]"></div>
+        <img id="full-player-bg-img" src="" class="absolute inset-0 w-full h-full object-cover z-[-2] blur-[70px] scale-[1.3] opacity-60 saturate-[1.2] transition-all duration-700 pointer-events-none">
+        <div class="absolute inset-0 bg-gradient-to-b from-black/20 via-black/50 to-black/90 z-[-1] pointer-events-none"></div>
+
+        <div class="w-full flex justify-center py-4 relative z-10" onclick="toggleFullPlayer(false)">
+            <div class="w-10 h-1.5 bg-white/30 rounded-full"></div>
         </div>
 
-        <!-- アートワークエリア -->
-        <!-- 下部マージンを拡大 (mb-8 を追加) -->
-        <div id="full-img-container" class="flex-1 flex items-center justify-center overflow-hidden w-full mb-8">
-            <!-- スワイプアニメーション用ラッパー（画像のスケールアニメーションと干渉しないため） -->
+        <div id="full-img-container" class="flex-1 flex items-center justify-center overflow-hidden w-full mb-8 relative z-10">
             <div id="artwork-wrapper" class="w-full h-full flex items-center justify-center">
-                <img id="full-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&h=500&fit=crop" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-2xl transition-all duration-500 scale-90" alt="cover">
+                <img id="full-img" src="img/iconcheer.png" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] transition-all duration-500 scale-90" alt="cover" onerror="this.src='https://via.placeholder.com/500x500.png?text=JOSO';">
             </div>
         </div>
 
-        <!-- タイトルエリア -->
-        <div class="mb-6">
+        <div class="mb-6 relative z-10">
             <div class="w-full">
                 <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
-                <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
+                <p id="full-artist" class="text-xl text-white/60 truncate">アーティスト</p>
             </div>
             
             <div class="flex items-center justify-between mt-4">
@@ -241,167 +284,208 @@
                     <button id="btn-loop-start" onclick="setLoopStart()" class="control-btn">START</button>
                     <button id="btn-loop-finish" onclick="setLoopFinish()" class="control-btn">FINISH</button>
                 </div>
-                <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right">LOOP ACTIVE</div>
+                <div class="flex items-center gap-4">
+                    <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right leading-tight max-w-[60px]">LOOP<br>ACTIVE</div>
+                    <button id="btn-favorite" onclick="toggleFavoriteCurrent()" class="text-2xl text-white/70 transition-all active:scale-75 w-10 h-10 flex items-center justify-center">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- 進捗バー -->
-        <div class="mb-8">
+        <div class="mb-8 relative z-10">
             <div class="seek-container">
-                <div class="seek-track-bg">
-                    <div id="seek-progress" class="seek-progress"></div>
-                </div>
+                <div class="seek-track-bg"><div id="seek-progress" class="seek-progress"></div></div>
                 <div id="loop-visual-bar"></div>
                 <div id="loop-marker-start" class="loop-marker"></div>
                 <div id="loop-marker-finish" class="loop-marker"></div>
                 <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
             </div>
-            <div class="flex justify-between text-[11px] font-bold text-white/30 mt-2">
+            <div class="flex justify-between text-[11px] font-bold text-white/50 mt-2">
                 <span id="time-curr">0:00</span>
                 <span id="time-total">0:00</span>
             </div>
         </div>
 
-        <!-- メインコントロール -->
-        <!-- 下マージンを縮小 (mb-10 -> mb-6) -->
-        <div class="flex justify-around items-center mb-6">
+        <div class="flex justify-around items-center mb-6 relative z-10">
             <button onclick="handlePrev()" class="text-3xl active:scale-90 transition-transform"><i class="fas fa-backward"></i></button>
             <button onclick="handlePlayPause()" class="text-6xl w-24 active:scale-95 transition-transform"><i id="full-play-btn" class="fas fa-play"></i></button>
             <button onclick="forceNextTrack()" class="text-3xl active:scale-90 transition-transform"><i class="fas fa-forward"></i></button>
         </div>
 
-        <!-- フッターアクション -->
-        <!-- 下マージンを縮小 (mb-4 -> mb-0) -->
-        <div id="full-footer" class="flex justify-around items-center px-4 text-white/40 text-xl mb-0 h-16 w-full">
-            <button id="btn-queue-toggle" onclick="onQueueButtonClick()" class="footer-icon-btn">
-                <i class="fas fa-list-ul"></i>
-            </button>
-            <button id="btn-lyrics-toggle" onclick="onLyricsButtonClick()" class="footer-icon-btn">
-                <i class="fas fa-quote-right"></i>
-            </button>
+        <div id="full-footer" class="flex justify-around items-center px-4 text-white/50 text-xl mb-0 h-16 w-full relative z-10">
+            <button onclick="onQueueButtonClick()" class="footer-icon-btn text-white" id="btn-queue-toggle"><i class="fas fa-list-ul"></i></button>
+            <button onclick="onLyricsButtonClick()" class="footer-icon-btn" id="btn-lyrics-toggle"><i class="fas fa-quote-right"></i></button>
         </div>
     </div>
 
-    <!-- キュー（再生リスト）画面 -->
+    <!-- === Apple Music風 歌詞画面 === -->
+    <div id="lyrics-view" class="fixed inset-0 z-[55] player-view translate-y-full flex flex-col overflow-hidden">
+        <!-- フルプレイヤーの背景を透かせるため、半透明のオーバーレイのみ -->
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-2xl z-[-1]"></div>
+        
+        <div class="flex justify-between items-center h-20 px-6 shrink-0 relative z-10 bg-gradient-to-b from-black/60 to-transparent pt-4">
+            <button onclick="toggleLyricsView(false)" class="w-10 h-10 flex items-center justify-center bg-white/10 rounded-full text-white/80 active:scale-95 transition-transform backdrop-blur-md">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="font-bold text-sm tracking-widest text-white/80">LYRICS</div>
+            <div class="w-10"></div> <!-- レイアウト調整用 -->
+        </div>
+        
+        <!-- 歌詞表示領域 -->
+        <div id="lyrics-container" class="flex-1 overflow-y-auto px-8 pb-48 pt-10 hide-scrollbar space-y-6 relative z-10 scroll-smooth">
+            <!-- JavaScriptで動的に生成 -->
+        </div>
+    </div>
+
+    <!-- キュー画面 -->
     <div id="queue-view" class="fixed inset-0 z-[60] player-view translate-y-full bg-black/95 flex flex-col backdrop-blur-3xl">
         <div id="queue-mini-player" class="h-16 flex items-center px-4 bg-white/10 shrink-0 cursor-pointer active:bg-white/20 transition-colors" onclick="toggleQueueView(false)">
-            <img id="queue-mini-img" src="" class="w-10 h-10 rounded object-cover" alt="cover">
+            <img id="queue-mini-img" src="img/iconcheer.png" class="w-10 h-10 rounded object-cover" alt="cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
             <div class="flex-1 ml-3 min-w-0">
                 <div id="queue-mini-title" class="text-sm font-semibold truncate">曲名</div>
                 <div id="queue-mini-artist" class="text-[11px] text-white/40 truncate">アーティスト</div>
             </div>
-            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
-                <i class="fas fa-chevron-down text-sm"></i>
-            </div>
+            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20"><i class="fas fa-chevron-down text-sm"></i></div>
         </div>
-
         <div class="flex justify-between items-center mb-4 px-6 pt-6 shrink-0">
             <h2 class="text-2xl font-bold">次に再生</h2>
         </div>
-        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 px-4 pb-10">
-        </div>
+        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 px-4 pb-10"></div>
     </div>
 
     <audio id="audio-element"></audio>
 
     <script>
-         const tracks = [
-            { id: 1, title: "校歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/1.mp3" },
-            { id: 2, title: "応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/2.mp3" },
-            { id: 3, title: "第二応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/3.mp3" },
-            { id: 4, title: "突撃のテーマ〜ダッシュ常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/4.mp3" },
-            { id: 5, title: "大進撃", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/5.mp3" },
-            { id: 6, title: "コンバットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/6.mp3" },
-            { id: 7, title: "狼少年ケン", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/7.mp3" },
-            { id: 8, title: "狙い撃ち", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/8.mp3" },
-            { id: 9, title: "サウスポー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/9.mp3" },
-            { id: 10, title: "カメハメハ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/10.mp3" },
-            { id: 11, title: "ブラジル", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/11.mp3" },
-            { id: 12, title: "アルプスチャンス", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/12.mp3" },
-            { id: 13, title: "チャンス常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/13.mp3" },
-            { id: 14, title: "See Off", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/14.mp3" },
-            { id: 15, title: "睡蓮花", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/15.mp3" },
-            { id: 16, title: "ベイブリーズ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/16.mp3" },
-            { id: 17, title: "F1", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/17.mp3" },
-            { id: 18, title: "ヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/18.mp3" },
-            { id: 19, title: "常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/19.mp3" },
-            { id: 20, title: "ワルキューレ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/20.mp3" },
-            { id: 21, title: "神風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/21.mp3" },
-            { id: 22, title: "エル・クンバンチェロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/22.mp3" },
-            { id: 23, title: "もののふ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/23.mp3" },
-            { id: 24, title: "ももクロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/24.mp3" },
-            { id: 25, title: "レーヴ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/25.mp3" },
-            { id: 26, title: "グラディエーター", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/26.mp3" },
-            { id: 27, title: "Newヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/27.mp3" },
-            { id: 28, title: "Newヒットマーチ〜常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/28.mp3" },
-            { id: 29, title: "かっせーパワプロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/29.mp3" },
-            { id: 30, title: "パワフルシンフォニー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/30.mp3" },
-            { id: 31, title: "校歌歌詞入り", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/31.mp3" },
-            { id: 32, title: "ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/32.mp3" },
-            { id: 33, title: "もののふ改", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/33.mp3" },
-            { id: 34, title: "吹奏楽", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/34.mp3" },
-            { id: 35, title: "ラピスラズリ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/35.mp3" },
-            { id: 36, title: "新ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/36.mp3" },
-            { id: 37, title: "燃えろ闘魂", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/37.mp3" },
-            { id: 38, title: "春風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/38.mp3" }
+        // tracks配列に lrc パスを追加 (ファイル名はIDと同じ番号を想定)
+        const tracks = [
+            { id: 1, title: "校歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/1.mp3", lrc: "lyrics/1.lrc" },
+            { id: 2, title: "応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/2.mp3", lrc: "lyrics/2.lrc" },
+            { id: 3, title: "第二応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/3.mp3", lrc: "lyrics/3.lrc" },
+            { id: 4, title: "突撃のテーマ〜ダッシュ常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/4.mp3", lrc: "lyrics/4.lrc" },
+            { id: 5, title: "大進撃", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/5.mp3", lrc: "lyrics/5.lrc" },
+            { id: 6, title: "コンバットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/6.mp3", lrc: "lyrics/6.lrc" },
+            { id: 7, title: "狼少年ケン", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/7.mp3", lrc: "lyrics/7.lrc" },
+            { id: 8, title: "狙い撃ち", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/8.mp3", lrc: "lyrics/8.lrc" },
+            { id: 9, title: "サウスポー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/9.mp3", lrc: "lyrics/9.lrc" },
+            { id: 10, title: "カメハメハ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/10.mp3", lrc: "lyrics/10.lrc" },
+            { id: 11, title: "ブラジル", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/11.mp3", lrc: "lyrics/11.lrc" },
+            { id: 12, title: "アルプスチャンス", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/12.mp3", lrc: "lyrics/12.lrc" },
+            { id: 13, title: "チャンス常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/13.mp3", lrc: "lyrics/13.lrc" },
+            { id: 14, title: "See Off", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/14.mp3", lrc: "lyrics/14.lrc" },
+            { id: 15, title: "睡蓮花", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/15.mp3", lrc: "lyrics/15.lrc" },
+            { id: 16, title: "ベイブリーズ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/16.mp3", lrc: "lyrics/16.lrc" },
+            { id: 17, title: "F1", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/17.mp3", lrc: "lyrics/17.lrc" },
+            { id: 18, title: "ヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/18.mp3", lrc: "lyrics/18.lrc" },
+            { id: 19, title: "常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/19.mp3", lrc: "lyrics/19.lrc" },
+            { id: 20, title: "ワルキューレ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/20.mp3", lrc: "lyrics/20.lrc" },
+            { id: 21, title: "神風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/21.mp3", lrc: "lyrics/21.lrc" },
+            { id: 22, title: "エル・クンバンチェロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/22.mp3", lrc: "lyrics/22.lrc" },
+            { id: 23, title: "もののふ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/23.mp3", lrc: "lyrics/23.lrc" },
+            { id: 24, title: "ももクロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/24.mp3", lrc: "lyrics/24.lrc" },
+            { id: 25, title: "レーヴ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/25.mp3", lrc: "lyrics/25.lrc" },
+            { id: 26, title: "グラディエーター", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/26.mp3", lrc: "lyrics/26.lrc" },
+            { id: 27, title: "Newヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/27.mp3", lrc: "lyrics/27.lrc" },
+            { id: 28, title: "Newヒットマーチ〜常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/28.mp3", lrc: "lyrics/28.lrc" },
+            { id: 29, title: "かっせーパワプロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/29.mp3", lrc: "lyrics/29.lrc" },
+            { id: 30, title: "パワフルシンフォニー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/30.mp3", lrc: "lyrics/30.lrc" },
+            { id: 31, title: "校歌歌詞入り", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/31.mp3", lrc: "lyrics/31.lrc" },
+            { id: 32, title: "ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/32.mp3", lrc: "lyrics/32.lrc" },
+            { id: 33, title: "もののふ改", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/33.mp3", lrc: "lyrics/33.lrc" },
+            { id: 34, title: "吹奏楽", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/34.mp3", lrc: "lyrics/34.lrc" },
+            { id: 35, title: "ラピスラズリ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/35.mp3", lrc: "lyrics/35.lrc" },
+            { id: 36, title: "新ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/36.mp3", lrc: "lyrics/36.lrc" },
+            { id: 37, title: "燃えろ闘魂", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/37.mp3", lrc: "lyrics/37.lrc" },
+            { id: 38, title: "春風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/38.mp3", lrc: "lyrics/38.lrc" }
         ];
 
         let currentIdx = -1;
         let isLooping = false; 
         let loopStartTime = null;
         let loopFinishTime = null;
-        let isMiniPlayerSwiping = false; // ミニプレイヤースワイプ判定用フラグ
+        let isMiniPlayerSwiping = false; 
         const audio = document.getElementById('audio-element');
 
-        function onLyricsButtonClick() { console.log("Lyrics feature"); }
-        function onQueueButtonClick() { toggleQueueView(true); }
+        let favorites = JSON.parse(localStorage.getItem('jmusic_favorites')) || [];
+        let playlists = JSON.parse(localStorage.getItem('jmusic_playlists')) || [];
+        
+        let selectedTrackIdForAction = null;
+        let currentEditingPlaylistId = null;
+        let isPlaylistEditing = false;
+        let playlistSortable = null;
+        let pendingPlaylistTrackId = null;
+        let tempNewPlaylistCover = null;
 
-        function toggleQueueView(show) {
-            const queueView = document.getElementById('queue-view');
-            const queueBtn = document.getElementById('btn-queue-toggle');
-            if (show) {
-                renderQueueList();
-                queueView.style.transform = "translateY(0)";
-                if(queueBtn) { queueBtn.classList.add('text-white'); queueBtn.classList.remove('text-white/40'); }
-            } else {
-                queueView.style.transform = "translateY(100%)";
-                if(queueBtn) { queueBtn.classList.remove('text-white'); queueBtn.classList.add('text-white/40'); }
+        // 歌詞管理用変数
+        let currentLyrics = [];
+        let currentLyricIndex = -1;
+
+        function saveData() {
+            try {
+                localStorage.setItem('jmusic_favorites', JSON.stringify(favorites));
+                localStorage.setItem('jmusic_playlists', JSON.stringify(playlists));
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    alert('保存容量の制限に達しました。古いプレイリスト画像を削除してください。');
+                }
             }
         }
 
-        function renderQueueList() {
-            const container = document.getElementById('queue-list');
-            container.innerHTML = '';
-            tracks.forEach((t, i) => {
-                const isActive = (i === currentIdx);
-                const div = document.createElement('div');
-                div.id = `queue-item-${i}`;
-                div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${
-                    isActive ? 'bg-white/10 border-l-4 border-red-500' : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'
-                }`;
-                div.onclick = () => playTrack(i);
-                div.innerHTML = `
-                    <div class="w-10 h-10 relative flex-shrink-0">
-                        <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" alt="cover">
-                        ${isActive ? `
-                        <div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center">
-                            <i class="fas fa-volume-up text-white text-xs"></i>
-                        </div>` : ''}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
-                        <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
+        function openView(id) {
+            document.getElementById(id).style.transform = 'translateX(0)';
+            if(id === 'view-favorites') renderFavorites();
+            if(id === 'view-playlists') renderPlaylists();
+        }
+        function closeView(id) {
+            document.getElementById(id).style.transform = 'translateX(100%)';
+        }
 
-            if (currentIdx !== -1) {
-                setTimeout(() => {
-                    const activeItem = document.getElementById(`queue-item-${currentIdx}`);
-                    if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }, 100);
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('pointer-events-none');
+            modal.classList.add('modal-enter');
+        }
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('modal-enter');
+            setTimeout(() => { modal.classList.add('pointer-events-none'); }, 300);
+        }
+
+        function processImageSelection(event, callback) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 300;
+                    let width = img.width; let height = img.height;
+                    if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
+                    else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+                    canvas.width = MAX_SIZE; canvas.height = MAX_SIZE;
+                    const ctx = canvas.getContext('2d');
+                    const offsetX = (width - MAX_SIZE) / 2; const offsetY = (height - MAX_SIZE) / 2;
+                    ctx.drawImage(img, -offsetX, -offsetY, width, height);
+                    callback(canvas.toDataURL('image/jpeg', 0.8));
+                }
+                img.src = e.target.result;
             }
+            reader.readAsDataURL(file);
+        }
+
+        function setTempNewPlaylistCover(dataUrl) {
+            tempNewPlaylistCover = dataUrl;
+            document.getElementById('new-playlist-cover-placeholder').classList.add('hidden');
+            const preview = document.getElementById('new-playlist-cover-preview');
+            preview.src = dataUrl; preview.classList.remove('hidden');
+        }
+        function updateCurrentPlaylistCover(dataUrl) {
+            if (!currentEditingPlaylistId) return;
+            const p = playlists.find(x => x.id === currentEditingPlaylistId);
+            if (p) { p.coverImage = dataUrl; saveData(); renderPlaylistDetailList(p); renderPlaylists(); }
         }
 
         function initLibrary() {
@@ -410,427 +494,475 @@
             tracks.forEach((t, i) => {
                 const div = document.createElement('div');
                 div.id = `song-item-${i}`;
-                div.className = "flex items-center gap-3 py-3 px-2 rounded-xl border-b border-white/5 active:bg-white/5 cursor-pointer transition-colors";
-                div.onclick = () => {
-                    playTrack(i);
-                    toggleFullPlayer(true);
-                };
+                div.className = "flex items-center gap-3 py-2 px-2 rounded-xl border-b border-white/5 active:bg-white/5 transition-colors";
                 div.innerHTML = `
-                    <img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-lg" alt="cover">
-                    <div class="min-w-0">
+                    <img src="${t.img}" class="w-12 h-12 rounded object-cover shadow-md" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
+                    <div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playTrackAndShowPlayer(${t.id})">
                         <div class="text-sm font-semibold truncate">${t.title}</div>
                         <div class="text-[10px] text-white/40">${t.artist}</div>
                     </div>
+                    <button onclick="openTrackOptions(${t.id})" class="w-10 h-10 flex items-center justify-center text-white/50 active:bg-white/10 rounded-full transition-colors shrink-0">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
                 `;
                 listContainer.appendChild(div);
             });
         }
 
+        // お気に入り・プレイリスト関連の関数 (省略せず維持)
+        function toggleFavoriteCurrent() { if (currentIdx !== -1) toggleFavorite(tracks[currentIdx].id); }
+        function toggleFavorite(trackId) {
+            const idx = favorites.indexOf(trackId);
+            if (idx > -1) favorites.splice(idx, 1); else favorites.push(trackId);
+            saveData(); updateFavoriteUI(trackId);
+            const favView = document.getElementById('view-favorites');
+            if (favView.style.transform === 'translateX(0px)' || favView.style.transform === 'translateX(0%)') renderFavorites();
+        }
+        function updateFavoriteUI(trackId) {
+            if (currentIdx !== -1 && tracks[currentIdx].id === trackId) {
+                document.getElementById('btn-favorite').innerHTML = favorites.includes(trackId) ? '<i class="fas fa-heart text-pink-500"></i>' : '<i class="far fa-heart"></i>';
+            }
+        }
+        function renderFavorites() {
+            const container = document.getElementById('favorites-list'); container.innerHTML = '';
+            if (favorites.length === 0) { container.innerHTML = '<div class="text-center text-white/50 mt-10">お気に入りはありません</div>'; return; }
+            favorites.forEach(trackId => {
+                const t = tracks.find(x => x.id === trackId); if(!t) return;
+                const div = document.createElement('div'); div.className = "flex items-center gap-3 py-2 border-b border-white/5";
+                div.innerHTML = `<img src="${t.img}" class="w-12 h-12 rounded object-cover shadow-md" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';"><div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playTrackAndShowPlayer(${t.id})"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div><button onclick="openTrackOptions(${t.id})" class="w-10 h-10 flex items-center justify-center text-white/50 active:bg-white/10 rounded-full transition-colors shrink-0"><i class="fas fa-ellipsis-h"></i></button>`;
+                container.appendChild(div);
+            });
+        }
+        function renderPlaylists() {
+            const container = document.getElementById('playlists-list'); container.innerHTML = '';
+            if (playlists.length === 0) { container.innerHTML = '<div class="col-span-2 text-center text-white/50 mt-4">プレイリストを作成してみましょう</div>'; return; }
+            playlists.forEach(p => {
+                const div = document.createElement('div'); div.className = "flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer mb-2"; div.onclick = () => openPlaylistDetail(p.id);
+                let coverImg = `<div class="w-full aspect-square bg-white/10 rounded-xl shadow-lg flex items-center justify-center"><i class="fas fa-music text-4xl text-white/30"></i></div>`;
+                if (p.coverImage) coverImg = `<img src="${p.coverImage}" class="w-full aspect-square object-cover rounded-xl shadow-lg">`;
+                else if (p.tracks.length > 0) { const ft = tracks.find(t => t.id === p.tracks[0]); if (ft) coverImg = `<img src="${ft.img}" class="w-full aspect-square object-cover rounded-xl shadow-lg" onerror="this.src='https://via.placeholder.com/300x300.png?text=JOSO';">`; }
+                div.innerHTML = `${coverImg}<div class="px-1"><div class="font-bold text-sm truncate leading-tight">${p.name}</div><div class="text-[11px] text-white/50">${p.tracks.length} 曲</div></div>`;
+                container.appendChild(div);
+            });
+        }
+        function createNewPlaylist() { openNewPlaylistModal(); }
+        function createNewPlaylistAndAdd(trackId) { openNewPlaylistModal(trackId); }
+        function openNewPlaylistModal(trackId = null) {
+            pendingPlaylistTrackId = trackId; document.getElementById('new-playlist-name').value = ''; tempNewPlaylistCover = null;
+            document.getElementById('new-playlist-cover-preview').classList.add('hidden'); document.getElementById('new-playlist-cover-preview').src = '';
+            document.getElementById('new-playlist-cover-placeholder').classList.remove('hidden'); document.getElementById('new-playlist-cover-input').value = '';
+            openModal('modal-new-playlist'); setTimeout(() => { document.getElementById('new-playlist-name').focus(); }, 300);
+        }
+        function submitNewPlaylist() {
+            const name = document.getElementById('new-playlist-name').value;
+            if (name && name.trim() !== "") {
+                const newId = 'pl_' + Date.now(); const tracksToAdd = pendingPlaylistTrackId ? [pendingPlaylistTrackId] : [];
+                playlists.push({ id: newId, name: name.trim(), tracks: tracksToAdd, coverImage: tempNewPlaylistCover });
+                saveData(); closeModal('modal-new-playlist'); renderPlaylists();
+                if (!pendingPlaylistTrackId) openPlaylistDetail(newId);
+                pendingPlaylistTrackId = null; tempNewPlaylistCover = null;
+            } else alert("プレイリスト名を入力してください");
+        }
+        function togglePlaylistEdit() {
+            isPlaylistEditing = !isPlaylistEditing; document.getElementById('btn-playlist-edit').innerText = isPlaylistEditing ? "完了" : "編集";
+            document.getElementById('detail-cover-edit-overlay').style.opacity = isPlaylistEditing ? '1' : '0';
+            if (isPlaylistEditing) document.getElementById('detail-cover-container').classList.add('cursor-pointer'); else document.getElementById('detail-cover-container').classList.remove('cursor-pointer');
+            const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p) renderPlaylistDetailList(p);
+        }
+        function handlePlaylistCoverTap() { if (isPlaylistEditing) document.getElementById('edit-playlist-cover-input').click(); }
+        function openPlaylistDetail(plId) {
+            currentEditingPlaylistId = plId; isPlaylistEditing = false; document.getElementById('btn-playlist-edit').innerText = "編集";
+            document.getElementById('detail-cover-edit-overlay').style.opacity = '0'; document.getElementById('detail-cover-container').classList.remove('cursor-pointer');
+            const p = playlists.find(x => x.id === plId); if(!p) return;
+            document.getElementById('detail-playlist-title').innerText = p.name; renderPlaylistDetailList(p); openView('view-playlist-detail');
+        }
+        function renderPlaylistDetailList(p) {
+            const container = document.getElementById('playlist-detail-list'); container.innerHTML = '';
+            if (playlistSortable) { playlistSortable.destroy(); playlistSortable = null; }
+            const coverInner = document.getElementById('detail-cover-inner');
+            if (p.coverImage) coverInner.innerHTML = `<img src="${p.coverImage}" class="w-full h-full object-cover">`;
+            else if (p.tracks.length > 0) { const ft = tracks.find(t => t.id === p.tracks[0]); if (ft) coverInner.innerHTML = `<img src="${ft.img}" class="w-full h-full object-cover">`; }
+            else coverInner.innerHTML = `<i class="fas fa-music text-6xl text-white/20"></i>`;
+
+            if (p.tracks.length === 0) {
+                container.innerHTML = '<div class="text-center text-white/50 mt-10">曲を追加してください</div>';
+                if(isPlaylistEditing) container.innerHTML += `<div class="mt-12 flex justify-center pb-12"><button onclick="openModal('modal-delete-playlist')" class="text-red-500 font-bold py-3 px-8 bg-red-500/10 rounded-xl active:bg-red-500/20 transition-colors">プレイリストを削除</button></div>`;
+                return;
+            }
+            p.tracks.forEach((trackId, index) => {
+                const t = tracks.find(x => x.id === trackId); if(!t) return;
+                const div = document.createElement('div'); div.className = "border-b border-white/5 overflow-hidden"; div.id = `playlist-item-${index}`;
+                if (isPlaylistEditing) {
+                    div.innerHTML = `<div class="flex items-center gap-3 py-2 px-4 bg-black w-full transition-all duration-300"><button onclick="animateAndRemoveTrack('${p.id}', ${index}, 'playlist-item-${index}')" class="w-8 h-8 flex items-center justify-center text-red-500 active:scale-90 transition-transform shrink-0"><i class="fas fa-minus-circle text-xl"></i></button><img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-sm"><div class="flex-1 min-w-0 py-1"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div><div class="w-8 h-8 flex items-center justify-center text-white/40 cursor-grab drag-handle shrink-0 active:text-white transition-colors"><i class="fas fa-bars"></i></div></div>`;
+                } else {
+                    div.innerHTML = `<div class="flex items-center gap-3 py-2 px-4 bg-black w-full active:bg-white/5 transition-colors cursor-pointer" onclick="playPlaylistTrack(${index})"><div class="w-4 text-center text-white/40 text-xs">${index + 1}</div><img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-sm"><div class="flex-1 min-w-0 py-1"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div></div>`;
+                }
+                container.appendChild(div);
+            });
+            if (isPlaylistEditing) {
+                playlistSortable = new Sortable(container, { handle: '.drag-handle', animation: 200, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', onEnd: function (evt) { const ni = evt.newIndex; const oi = evt.oldIndex; if(oi === ni) return; const movedItem = p.tracks.splice(oi, 1)[0]; p.tracks.splice(ni, 0, movedItem); saveData(); } });
+                container.innerHTML += `<div class="mt-8 flex justify-center pb-8"><button onclick="openModal('modal-delete-playlist')" class="text-red-500 font-bold py-3 px-8 bg-red-500/10 rounded-xl active:bg-red-500/20 transition-colors">プレイリストを削除</button></div>`;
+            }
+        }
+        function animateAndRemoveTrack(plId, index, elementId) {
+            const el = document.getElementById(elementId);
+            if (el) { el.firstElementChild.classList.add('slide-out-left'); setTimeout(() => removeTrackFromPlaylist(plId, index), 300); } 
+            else removeTrackFromPlaylist(plId, index);
+        }
+        function removeTrackFromPlaylist(plId, index) { const p = playlists.find(x => x.id === plId); if(p) { p.tracks.splice(index, 1); saveData(); renderPlaylistDetailList(p); renderPlaylists(); } }
+        function confirmDeletePlaylist() { if(!currentEditingPlaylistId) return; playlists = playlists.filter(x => x.id !== currentEditingPlaylistId); saveData(); closeModal('modal-delete-playlist'); closeView('view-playlist-detail'); renderPlaylists(); }
+        function playPlaylist() { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks.length > 0) { const gIdx = tracks.findIndex(t => t.id === p.tracks[0]); if(gIdx !== -1) playTrackAndShowPlayer(tracks[gIdx].id); } }
+        function playPlaylistTrack(idxInPl) { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks[idxInPl]) { const gIdx = tracks.findIndex(t => t.id === p.tracks[idxInPl]); if(gIdx !== -1) playTrackAndShowPlayer(tracks[gIdx].id); } }
+        function openTrackSelector() { renderTrackSelector(); openModal('modal-track-selector'); }
+        function renderTrackSelector() {
+            const p = playlists.find(x => x.id === currentEditingPlaylistId); if(!p) return;
+            const container = document.getElementById('selector-track-list'); container.innerHTML = '';
+            tracks.forEach(t => {
+                const isSelected = p.tracks.includes(t.id); const div = document.createElement('div');
+                div.className = "flex items-center gap-3 py-2 border-b border-white/5 cursor-pointer active:bg-white/5 transition-colors";
+                div.onclick = () => {
+                    const cb = div.querySelector('.custom-checkbox');
+                    if (p.tracks.includes(t.id)) { p.tracks = p.tracks.filter(id => id !== t.id); cb.innerHTML = '<div class="w-5 h-5 rounded border border-white/30 transition-colors"></div>'; } 
+                    else { p.tracks.push(t.id); cb.innerHTML = '<div class="w-5 h-5 rounded bg-red-500 flex items-center justify-center transition-colors"><i class="fas fa-check text-white text-xs"></i></div>'; }
+                };
+                div.innerHTML = `<div class="custom-checkbox w-8 flex justify-center">${isSelected ? '<div class="w-5 h-5 rounded bg-red-500 flex items-center justify-center"><i class="fas fa-check text-white text-xs"></i></div>' : '<div class="w-5 h-5 rounded border border-white/30"></div>'}</div><img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-sm"><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div>`;
+                container.appendChild(div);
+            });
+        }
+        function saveTrackSelection() { saveData(); const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p) { renderPlaylistDetailList(p); renderPlaylists(); } closeModal('modal-track-selector'); }
+        function openTrackOptions(trackId) {
+            selectedTrackIdForAction = trackId; const t = tracks.find(x => x.id === trackId);
+            document.getElementById('opt-title').innerText = t.title; document.getElementById('opt-artist').innerText = t.artist; document.getElementById('opt-img').src = t.img;
+            const isFav = favorites.includes(trackId); document.getElementById('opt-fav-icon').className = isFav ? "fas fa-heart text-pink-500 text-xl w-6 text-center" : "far fa-heart text-xl w-6 text-center"; document.getElementById('opt-fav-text').innerText = isFav ? "お気に入りから削除" : "お気に入りに追加";
+            openModal('modal-track-options');
+        }
+        function optToggleFavorite() { if (!selectedTrackIdForAction) return; toggleFavorite(selectedTrackIdForAction); closeModal('modal-track-options'); }
+        function optAddToPlaylist() { closeModal('modal-track-options'); setTimeout(() => openPlaylistSelectModal(), 300); }
+        function openPlaylistSelectModal() { renderPlaylistSelectList(); openModal('modal-playlist-select'); }
+        function renderPlaylistSelectList() {
+            const container = document.getElementById('select-playlist-list'); container.innerHTML = '';
+            const newBtn = document.createElement('button'); newBtn.className = "w-full py-4 flex items-center gap-4 active:bg-white/5 transition-colors border-b border-white/5 text-red-500 font-bold"; newBtn.innerHTML = '<i class="fas fa-plus w-12 text-center text-xl"></i><span>新規プレイリスト</span>'; newBtn.onclick = () => { closeModal('modal-playlist-select'); setTimeout(() => createNewPlaylistAndAdd(selectedTrackIdForAction), 300); }; container.appendChild(newBtn);
+            playlists.forEach(p => {
+                const btn = document.createElement('button'); btn.className = "w-full py-3 flex items-center gap-4 active:bg-white/5 transition-colors border-b border-white/5 text-left";
+                btn.innerHTML = `<div class="w-12 h-12 bg-white/10 rounded flex items-center justify-center shrink-0 overflow-hidden">${p.coverImage ? `<img src="${p.coverImage}" class="w-full h-full object-cover">` : '<i class="fas fa-music text-white/50"></i>'}</div><div class="flex-1 font-semibold truncate">${p.name}</div>`;
+                btn.onclick = () => { if (!p.tracks.includes(selectedTrackIdForAction)) { p.tracks.push(selectedTrackIdForAction); saveData(); } closeModal('modal-playlist-select'); };
+                container.appendChild(btn);
+            });
+        }
+
+        // ====== プレイヤーコア ======
+        function playTrackAndShowPlayer(trackId) {
+            const idx = tracks.findIndex(t => t.id === trackId);
+            if(idx !== -1) { playTrack(idx); toggleFullPlayer(true); }
+        }
+
         function playTrack(idx) {
             if (idx === currentIdx && !audio.paused) return;
-            
-            if (currentIdx !== -1) {
-                const prevSongItem = document.getElementById(`song-item-${currentIdx}`);
-                if (prevSongItem) prevSongItem.classList.remove('active-song-item');
-            }
+            if (currentIdx !== -1) { const prevSongItem = document.getElementById(`song-item-${currentIdx}`); if (prevSongItem) prevSongItem.classList.remove('active-song-item'); }
 
-            currentIdx = idx;
-            const t = tracks[idx];
-            audio.src = t.src;
+            currentIdx = idx; const t = tracks[idx]; audio.src = t.src;
             
-            const newSongItem = document.getElementById(`song-item-${idx}`);
-            if (newSongItem) newSongItem.classList.add('active-song-item');
+            const newSongItem = document.getElementById(`song-item-${idx}`); if (newSongItem) newSongItem.classList.add('active-song-item');
+            document.getElementById('mini-title').innerText = t.title; document.getElementById('full-title').innerText = t.title;
+            document.getElementById('mini-artist').innerText = t.artist; document.getElementById('full-artist').innerText = t.artist;
+            document.getElementById('mini-img').src = t.img; document.getElementById('full-img').src = t.img;
+            document.getElementById('full-player-bg-img').src = t.img; document.getElementById('bg-blur').style.backgroundColor = t.color;
+            document.getElementById('queue-mini-title').innerText = t.title; document.getElementById('queue-mini-artist').innerText = t.artist; document.getElementById('queue-mini-img').src = t.img;
             
-            document.getElementById('mini-title').innerText = t.title;
-            document.getElementById('full-title').innerText = t.title;
-            document.getElementById('mini-artist').innerText = t.artist;
-            document.getElementById('full-artist').innerText = t.artist;
-            document.getElementById('mini-img').src = t.img;
-            document.getElementById('full-img').src = t.img;
-            document.getElementById('bg-blur').style.backgroundColor = t.color;
-            
-            document.getElementById('queue-mini-title').innerText = t.title;
-            document.getElementById('queue-mini-artist').innerText = t.artist;
-            document.getElementById('queue-mini-img').src = t.img;
-            
-            document.getElementById('seek-progress').style.width = '0%';
-            document.getElementById('seek-bar').value = 0;
+            document.getElementById('seek-progress').style.width = '0%'; document.getElementById('seek-bar').value = 0;
 
-            resetLoopState(); 
-            audio.play();
-            updateMediaSession();
-            updatePlayButtonIcons();
+            updateFavoriteUI(t.id); resetLoopState(); audio.play(); updateMediaSession(); updatePlayButtonIcons();
 
             const queueView = document.getElementById('queue-view');
-            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
-                renderQueueList();
+            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") renderQueueList();
+            
+            // 曲が変わったら歌詞データを読み込む
+            loadLyrics(t.id, t.lrc);
+        }
+
+        // ====== 歌詞（LRC）パーサーと同期ロジック ======
+        async function loadLyrics(trackId, lrcPath) {
+            currentLyrics = [];
+            currentLyricIndex = -1;
+            const container = document.getElementById('lyrics-container');
+            container.innerHTML = '<div class="text-white/50 text-center mt-20 font-bold text-xl">読み込み中...</div>';
+
+            if (!lrcPath) {
+                container.innerHTML = '<div class="text-white/30 text-center mt-20 font-bold text-xl">歌詞がありません</div>';
+                return;
+            }
+
+            try {
+                // Fetch APIを使ってローカルまたはサーバー上のLRCファイルを取得
+                const response = await fetch(lrcPath);
+                if (!response.ok) throw new Error('File not found or CORS error');
+                const text = await response.text();
+                currentLyrics = parseLRC(text);
+                renderLyrics();
+            } catch (error) {
+                console.warn('歌詞の読み込みエラー:', error);
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center mt-20 opacity-50">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                        <div class="font-bold text-xl mb-2">現在歌詞はご覧になれません</div>
+                        <div class="text-xs text-center px-4 leading-relaxed max-w-sm">
+                            <code class="bg-white/10 px-1 rounded">${lrcPath}</code> が見つからないか、ブラウザのセキュリティ制限(CORS)によりブロックされました。<br>
+                            ※ローカルファイルを直接開いている場合は、VSCodeのLive Server等をご利用ください。
+                        </div>
+                    </div>
+                `;
             }
         }
 
-        // --- ループ機能 ---
-        function setLoopStart() { loopStartTime = audio.currentTime; isLooping = true; updateLoopUI(); }
-        function setLoopFinish() {
-            if (loopStartTime === null) loopStartTime = 0;
-            loopFinishTime = audio.currentTime;
-            isLooping = true;
-            if (loopFinishTime < loopStartTime) [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime];
-            updateLoopUI();
+        function parseLRC(lrcText) {
+            const lines = lrcText.split('\n');
+            const lyrics = [];
+            // [mm:ss.xx] または [mm:ss.xxx] の形式に対応する正規表現
+            const timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
+            
+            for (let line of lines) {
+                const match = timeReg.exec(line);
+                if (match) {
+                    const min = parseInt(match[1], 10);
+                    const sec = parseInt(match[2], 10);
+                    const ms = parseInt(match[3], 10);
+                    // ミリ秒の桁数が2桁か3桁かで計算を変える
+                    const time = min * 60 + sec + (ms / (match[3].length === 3 ? 1000 : 100));
+                    const text = line.replace(timeReg, '').trim();
+                    if (text) {
+                        lyrics.push({ time, text });
+                    }
+                }
+            }
+            return lyrics;
         }
-        function toggleLoopMode() {
-            if (isLooping) resetLoopState();
-            else isLooping = true;
-            updateLoopUI();
-        }
-        function resetLoopState() {
-            isLooping = false; loopStartTime = null; loopFinishTime = null; updateLoopUI();
-        }
-        function updateLoopUI() {
-            const btnToggle = document.getElementById('btn-loop-toggle');
-            const btnStart = document.getElementById('btn-loop-start');
-            const btnFinish = document.getElementById('btn-loop-finish');
-            const indicator = document.getElementById('loop-indicator');
-            const visualBar = document.getElementById('loop-visual-bar');
-            const markerStart = document.getElementById('loop-marker-start');
-            const markerFinish = document.getElementById('loop-marker-finish');
 
-            btnToggle.classList.toggle('active', isLooping);
-            btnStart.classList.toggle('active', loopStartTime !== null);
-            btnFinish.classList.toggle('active', loopFinishTime !== null);
+        function renderLyrics() {
+            const container = document.getElementById('lyrics-container');
+            container.innerHTML = '';
+            
+            if (currentLyrics.length === 0) {
+                container.innerHTML = '<div class="text-white/30 text-center mt-20 font-bold text-xl">歌詞データが空です</div>';
+                return;
+            }
 
-            if (isLooping) {
-                indicator.style.opacity = "1";
-                updateLoopVisualBar();
-                indicator.innerText = (loopStartTime !== null && loopFinishTime !== null) ? "A-B LOOP ACTIVE" : "SINGLE TRACK LOOP ACTIVE";
+            currentLyrics.forEach((lyric, index) => {
+                const p = document.createElement('p');
+                p.id = `lyric-${index}`;
+                p.className = 'lyric-line';
+                p.innerText = lyric.text;
+                // タップでその歌詞の時間にシークする
+                p.onclick = () => {
+                    audio.currentTime = lyric.time;
+                    if (audio.paused) audio.play();
+                };
+                container.appendChild(p);
+            });
+            
+            // スクロールのための余白
+            const spacer = document.createElement('div');
+            spacer.className = "h-40";
+            container.appendChild(spacer);
+        }
+
+        function updateLyricsUI(currentTime) {
+            if (currentLyrics.length === 0) return;
+            
+            let newIndex = -1;
+            for (let i = 0; i < currentLyrics.length; i++) {
+                // 0.3秒ほど早めにハイライトさせる（歌い出しのタイミングを合わせるため）
+                if (currentTime + 0.3 >= currentLyrics[i].time) {
+                    newIndex = i;
+                } else {
+                    break;
+                }
+            }
+            
+            if (newIndex !== currentLyricIndex && newIndex !== -1) {
+                if (currentLyricIndex !== -1) {
+                    const oldEl = document.getElementById(`lyric-${currentLyricIndex}`);
+                    if (oldEl) oldEl.classList.remove('lyric-active');
+                }
+                
+                currentLyricIndex = newIndex;
+                const activeEl = document.getElementById(`lyric-${currentLyricIndex}`);
+                
+                if (activeEl) {
+                    activeEl.classList.add('lyric-active');
+                    // 歌詞画面が開いている時だけ自動スクロール
+                    const lyricsView = document.getElementById('lyrics-view');
+                    if (lyricsView.style.transform === "translateY(0px)" || lyricsView.style.transform === "translateY(0)") {
+                        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            }
+        }
+
+        function onLyricsButtonClick() { toggleLyricsView(true); }
+        function toggleLyricsView(show) {
+            const lyricsView = document.getElementById('lyrics-view');
+            const lyricsBtn = document.getElementById('btn-lyrics-toggle');
+            if (show) {
+                lyricsView.style.transform = "translateY(0)";
+                if(lyricsBtn) { lyricsBtn.classList.add('text-white'); lyricsBtn.classList.remove('text-white/40'); }
+                // 開いた瞬間に現在行へスクロール
+                if (currentLyricIndex !== -1) {
+                    setTimeout(() => {
+                        const activeEl = document.getElementById(`lyric-${currentLyricIndex}`);
+                        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 300);
+                }
             } else {
-                indicator.style.opacity = "0";
-                visualBar.style.opacity = "0";
-                markerStart.style.opacity = "0";
-                markerFinish.style.opacity = "0";
+                lyricsView.style.transform = "translateY(100%)";
+                if(lyricsBtn) { lyricsBtn.classList.remove('text-white'); lyricsBtn.classList.add('text-white/40'); }
             }
         }
 
+        // --- 以下既存のプレイヤー制御・ループ・スワイプ処理 ---
+        function setLoopStart() { loopStartTime = audio.currentTime; isLooping = true; updateLoopUI(); }
+        function setLoopFinish() { if (loopStartTime === null) loopStartTime = 0; loopFinishTime = audio.currentTime; isLooping = true; if (loopFinishTime < loopStartTime) [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime]; updateLoopUI(); }
+        function toggleLoopMode() { if (isLooping) resetLoopState(); else isLooping = true; updateLoopUI(); }
+        function resetLoopState() { isLooping = false; loopStartTime = null; loopFinishTime = null; updateLoopUI(); }
+        function updateLoopUI() {
+            const btnToggle = document.getElementById('btn-loop-toggle'); const btnStart = document.getElementById('btn-loop-start'); const btnFinish = document.getElementById('btn-loop-finish'); const indicator = document.getElementById('loop-indicator'); const visualBar = document.getElementById('loop-visual-bar'); const markerStart = document.getElementById('loop-marker-start'); const markerFinish = document.getElementById('loop-marker-finish');
+            btnToggle.classList.toggle('active', isLooping); btnStart.classList.toggle('active', loopStartTime !== null); btnFinish.classList.toggle('active', loopFinishTime !== null);
+            if (isLooping) { indicator.style.opacity = "1"; updateLoopVisualBar(); indicator.innerHTML = (loopStartTime !== null && loopFinishTime !== null) ? "A-B LOOP<br>ACTIVE" : "SINGLE<br>LOOP"; } 
+            else { indicator.style.opacity = "0"; visualBar.style.opacity = "0"; markerStart.style.opacity = "0"; markerFinish.style.opacity = "0"; }
+        }
         function updateLoopVisualBar() {
-            const visualBar = document.getElementById('loop-visual-bar');
-            const markerStart = document.getElementById('loop-marker-start');
-            const markerFinish = document.getElementById('loop-marker-finish');
-
+            const visualBar = document.getElementById('loop-visual-bar'); const markerStart = document.getElementById('loop-marker-start'); const markerFinish = document.getElementById('loop-marker-finish');
             if (audio.duration) {
-                if (loopStartTime !== null) {
-                    markerStart.style.left = (loopStartTime / audio.duration) * 100 + "%";
-                    markerStart.style.opacity = "1";
-                } else markerStart.style.opacity = "0";
-
-                if (loopFinishTime !== null) {
-                    markerFinish.style.left = (loopFinishTime / audio.duration) * 100 + "%";
-                    markerFinish.style.opacity = "1";
-                } else markerFinish.style.opacity = "0";
-
-                if (loopStartTime !== null && loopFinishTime !== null) {
-                    const startPercent = (loopStartTime / audio.duration) * 100;
-                    const endPercent = (loopFinishTime / audio.duration) * 100;
-                    visualBar.style.left = startPercent + "%";
-                    visualBar.style.width = (endPercent - startPercent) + "%";
-                    visualBar.style.opacity = "1";
-                } else visualBar.style.opacity = "0";
+                if (loopStartTime !== null) { markerStart.style.left = (loopStartTime / audio.duration) * 100 + "%"; markerStart.style.opacity = "1"; } else markerStart.style.opacity = "0";
+                if (loopFinishTime !== null) { markerFinish.style.left = (loopFinishTime / audio.duration) * 100 + "%"; markerFinish.style.opacity = "1"; } else markerFinish.style.opacity = "0";
+                if (loopStartTime !== null && loopFinishTime !== null) { const startPercent = (loopStartTime / audio.duration) * 100; const endPercent = (loopFinishTime / audio.duration) * 100; visualBar.style.left = startPercent + "%"; visualBar.style.width = (endPercent - startPercent) + "%"; visualBar.style.opacity = "1"; } else visualBar.style.opacity = "0";
             }
         }
 
         audio.ontimeupdate = () => {
             if (currentIdx === -1) return;
-            if (isLooping) {
-                if (loopStartTime !== null && loopFinishTime !== null) {
-                    if (audio.currentTime >= loopFinishTime) audio.currentTime = loopStartTime;
-                } else {
-                    if (audio.currentTime >= audio.duration - 0.2) {
-                        audio.currentTime = 0;
-                        audio.play();
-                    }
-                }
-            }
-
+            if (isLooping) { if (loopStartTime !== null && loopFinishTime !== null) { if (audio.currentTime >= loopFinishTime) audio.currentTime = loopStartTime; } else { if (audio.currentTime >= audio.duration - 0.2) { audio.currentTime = 0; audio.play(); } } }
             if (!isNaN(audio.duration)) {
-                const bar = document.getElementById('seek-bar');
-                bar.max = audio.duration;
-                bar.value = audio.currentTime;
-                
-                const progressPercent = (audio.currentTime / audio.duration) * 100;
-                document.getElementById('seek-progress').style.width = progressPercent + '%';
-
+                const bar = document.getElementById('seek-bar'); bar.max = audio.duration; bar.value = audio.currentTime;
+                document.getElementById('seek-progress').style.width = (audio.currentTime / audio.duration) * 100 + '%';
                 document.getElementById('time-curr').innerText = formatTime(audio.currentTime);
                 document.getElementById('time-total').innerText = formatTime(audio.duration);
                 if (isLooping) updateLoopVisualBar();
             }
+            // 歌詞の同期更新を呼び出し
+            updateLyricsUI(audio.currentTime);
         };
 
         audio.onplay = () => updatePlayButtonIcons();
         audio.onpause = () => updatePlayButtonIcons();
-        audio.onended = () => {
-            if (!isLooping) handleNext();
-            else if (loopStartTime === null || loopFinishTime === null) { audio.currentTime = 0; audio.play(); }
-        };
+        audio.onended = () => { if (!isLooping) handleNext(); else if (loopStartTime === null || loopFinishTime === null) { audio.currentTime = 0; audio.play(); } };
 
-        function handlePlayPause() {
-            if (currentIdx === -1) { playTrack(0); return; }
-            if (audio.paused) audio.play(); else audio.pause();
-        }
-
+        function handlePlayPause() { if (currentIdx === -1) { playTrack(0); return; } if (audio.paused) audio.play(); else audio.pause(); }
         function updatePlayButtonIcons() {
-            const miniIcon = document.getElementById('mini-play-btn');
-            const fullIcon = document.getElementById('full-play-btn');
             const isPaused = audio.paused;
-            miniIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
-            fullIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
+            document.getElementById('mini-play-btn').className = isPaused ? "fas fa-play text-xl" : "fas fa-pause text-xl";
+            document.getElementById('full-play-btn').className = isPaused ? "fas fa-play" : "fas fa-pause";
             document.getElementById('full-img').style.transform = isPaused ? "scale(0.85)" : "scale(1.0)";
         }
 
         function handleNext() { forceNextTrack(); }
-        
-        // 通常の巻き戻しボタン用（5秒判定あり）
-        function handlePrev() { 
-            if (currentIdx === -1) return;
-            if (audio.currentTime >= 5.0) audio.currentTime = 0;
-            else forcePrevTrack();
-        }
-        
-        // スワイプ用（5秒判定無視）
-        function forcePrevTrack() {
-            if (currentIdx === -1) return;
-            playTrack((currentIdx - 1 + tracks.length) % tracks.length);
-        }
-        // スワイプ用・強制次曲
-        function forceNextTrack() {
-            if (currentIdx === -1) return;
-            playTrack((currentIdx + 1) % tracks.length);
-        }
-        
-        function handleSeek(v) { 
-            audio.currentTime = v; 
-            if (!isNaN(audio.duration)) {
-                const progressPercent = (v / audio.duration) * 100;
-                document.getElementById('seek-progress').style.width = progressPercent + '%';
-            }
-        }
+        function handlePrev() { if (currentIdx === -1) return; if (audio.currentTime >= 5.0) audio.currentTime = 0; else forcePrevTrack(); }
+        function forcePrevTrack() { if (currentIdx === -1) return; playTrack((currentIdx - 1 + tracks.length) % tracks.length); }
+        function forceNextTrack() { if (currentIdx === -1) return; playTrack((currentIdx + 1) % tracks.length); }
+        function handleSeek(v) { audio.currentTime = v; if (!isNaN(audio.duration)) document.getElementById('seek-progress').style.width = (v / audio.duration) * 100 + '%'; }
 
-        // ミニプレイヤーのクリックイベントハンドラ（スワイプ時の誤発火防止）
-        function handleMiniPlayerClick() {
-            if (!isMiniPlayerSwiping) {
-                toggleFullPlayer(true);
-            }
-        }
-
+        function handleMiniPlayerClick() { if (!isMiniPlayerSwiping) toggleFullPlayer(true); }
         function toggleFullPlayer(show) {
-            const player = document.getElementById('full-player');
-            const mini = document.getElementById('mini-player');
-            player.style.transform = show ? "translateY(0)" : "translateY(100%)";
-            mini.style.opacity = show ? "0" : "1";
-            mini.style.pointerEvents = show ? "none" : "auto";
+            document.getElementById('full-player').style.transform = show ? "translateY(0)" : "translateY(100%)";
+            const mini = document.getElementById('mini-player'); mini.style.opacity = show ? "0" : "1"; mini.style.pointerEvents = show ? "none" : "auto";
         }
 
-        function formatTime(s) {
-            if (isNaN(s)) return "0:00";
-            const m = Math.floor(s / 60);
-            const sec = Math.floor(s % 60);
-            return `${m}:${sec < 10 ? '0' + sec : sec}`;
+        function onQueueButtonClick() { toggleQueueView(true); }
+        function toggleQueueView(show) {
+            const queueView = document.getElementById('queue-view'); const queueBtn = document.getElementById('btn-queue-toggle');
+            if (show) { renderQueueList(); queueView.style.transform = "translateY(0)"; if(queueBtn) { queueBtn.classList.add('text-white'); queueBtn.classList.remove('text-white/40'); } } 
+            else { queueView.style.transform = "translateY(100%)"; if(queueBtn) { queueBtn.classList.remove('text-white'); queueBtn.classList.add('text-white/40'); } }
+        }
+        function renderQueueList() {
+            const container = document.getElementById('queue-list'); container.innerHTML = '';
+            tracks.forEach((t, i) => {
+                const isActive = (i === currentIdx); const div = document.createElement('div'); div.id = `queue-item-${i}`;
+                div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10 border-l-4 border-red-500' : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'}`;
+                div.onclick = () => playTrack(i);
+                div.innerHTML = `<div class="w-10 h-10 relative flex-shrink-0"><img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">${isActive ? `<div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center"><i class="fas fa-volume-up text-white text-xs"></i></div>` : ''}</div><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div><div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div></div>`;
+                container.appendChild(div);
+            });
+            if (currentIdx !== -1) { setTimeout(() => { const activeItem = document.getElementById(`queue-item-${currentIdx}`); if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); }
         }
 
-        // ==========================================
-        // スワイプ・アニメーション（紙芝居）関連処理
-        // ==========================================
+        function formatTime(s) { if (isNaN(s)) return "0:00"; const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m}:${sec < 10 ? '0' + sec : sec}`; }
 
         function setupSwipeEvents() {
-            // アートワーク（フルプレイヤー）の横スワイプ
             const artworkWrapper = document.getElementById('artwork-wrapper');
-            let startX = 0, startY = 0;
-            let isArtworkDragging = false;
-
-            artworkWrapper.addEventListener('touchstart', (e) => {
-                startX = e.touches[0].clientX;
-                startY = e.touches[0].clientY;
-                isArtworkDragging = true;
-                artworkWrapper.style.transition = 'none';
-            }, { passive: true });
-
+            let startX = 0, startY = 0, isArtworkDragging = false;
+            artworkWrapper.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; isArtworkDragging = true; artworkWrapper.style.transition = 'none'; }, { passive: true });
             artworkWrapper.addEventListener('touchmove', (e) => {
-                if (!isArtworkDragging) return;
-                const currentX = e.touches[0].clientX;
-                const currentY = e.touches[0].clientY;
-                const diffX = currentX - startX;
-                const diffY = currentY - startY;
-
-                // 横方向の移動量が縦方向より大きい場合はスワイプと判定
-                if (Math.abs(diffX) > Math.abs(diffY)) {
-                    e.preventDefault(); // デフォルトのスクロールや縦スワイプ閉じる動作を防止
-                    e.stopPropagation(); 
-                    artworkWrapper.style.transform = `translateX(${diffX}px)`;
-                } else {
-                    isArtworkDragging = false; // 縦スワイプとみなし解除
-                    artworkWrapper.style.transition = 'transform 0.3s ease';
-                    artworkWrapper.style.transform = `translateX(0)`;
-                }
-            }, { passive: false }); // preventDefaultを有効にするため false
-
+                if (!isArtworkDragging) return; const diffX = e.touches[0].clientX - startX; const diffY = e.touches[0].clientY - startY;
+                if (Math.abs(diffX) > Math.abs(diffY)) { e.preventDefault(); e.stopPropagation(); artworkWrapper.style.transform = `translateX(${diffX}px)`; } 
+                else { isArtworkDragging = false; artworkWrapper.style.transition = 'transform 0.3s ease'; artworkWrapper.style.transform = `translateX(0)`; }
+            }, { passive: false });
             artworkWrapper.addEventListener('touchend', (e) => {
-                if (!isArtworkDragging) return;
-                isArtworkDragging = false;
-                
-                const diffX = e.changedTouches[0].clientX - startX;
-                const threshold = window.innerWidth * 0.25;
-
+                if (!isArtworkDragging) return; isArtworkDragging = false; const diffX = e.changedTouches[0].clientX - startX; const threshold = window.innerWidth * 0.25;
                 if (diffX < -threshold) {
-                    // 左スワイプ -> 次の曲
-                    artworkWrapper.style.transition = 'transform 0.2s ease';
-                    artworkWrapper.style.transform = `translateX(-100vw)`;
-                    setTimeout(() => {
-                        forceNextTrack();
-                        artworkWrapper.style.transition = 'none';
-                        artworkWrapper.style.transform = `translateX(100vw)`;
-                        void artworkWrapper.offsetWidth; // リフロー強制
-                        artworkWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                        artworkWrapper.style.transform = `translateX(0)`;
-                    }, 200);
+                    artworkWrapper.style.transition = 'transform 0.2s ease'; artworkWrapper.style.transform = `translateX(-100vw)`;
+                    setTimeout(() => { forceNextTrack(); artworkWrapper.style.transition = 'none'; artworkWrapper.style.transform = `translateX(100vw)`; void artworkWrapper.offsetWidth; artworkWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)'; artworkWrapper.style.transform = `translateX(0)`; }, 200);
                 } else if (diffX > threshold) {
-                    // 右スワイプ -> 前の曲
-                    artworkWrapper.style.transition = 'transform 0.2s ease';
-                    artworkWrapper.style.transform = `translateX(100vw)`;
-                    setTimeout(() => {
-                        forcePrevTrack(); // 5秒判定を無視
-                        artworkWrapper.style.transition = 'none';
-                        artworkWrapper.style.transform = `translateX(-100vw)`;
-                        void artworkWrapper.offsetWidth; // リフロー強制
-                        artworkWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                        artworkWrapper.style.transform = `translateX(0)`;
-                    }, 200);
-                } else {
-                    // 元の位置に戻る
-                    artworkWrapper.style.transition = 'transform 0.3s ease';
-                    artworkWrapper.style.transform = `translateX(0)`;
-                }
+                    artworkWrapper.style.transition = 'transform 0.2s ease'; artworkWrapper.style.transform = `translateX(100vw)`;
+                    setTimeout(() => { forcePrevTrack(); artworkWrapper.style.transition = 'none'; artworkWrapper.style.transform = `translateX(-100vw)`; void artworkWrapper.offsetWidth; artworkWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)'; artworkWrapper.style.transform = `translateX(0)`; }, 200);
+                } else { artworkWrapper.style.transition = 'transform 0.3s ease'; artworkWrapper.style.transform = `translateX(0)`; }
             });
 
-            // ミニプレイヤーの横スワイプ
-            const miniPlayer = document.getElementById('mini-player');
-            let mStartX = 0, mStartY = 0;
-            let isMiniDragging = false;
-
-            miniPlayer.addEventListener('touchstart', (e) => {
-                // ボタンがタップされた場合はスワイプ処理しない
-                if (e.target.closest('button')) return;
-                
-                mStartX = e.touches[0].clientX;
-                mStartY = e.touches[0].clientY;
-                isMiniDragging = true;
-                isMiniPlayerSwiping = false; // 初期化
-                miniPlayer.style.transition = 'none';
-            }, { passive: true });
-
-            miniPlayer.addEventListener('touchmove', (e) => {
-                if (!isMiniDragging) return;
-                const currentX = e.touches[0].clientX;
-                const currentY = e.touches[0].clientY;
-                const diffX = currentX - mStartX;
-                const diffY = currentY - mStartY;
-
-                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
-                    e.preventDefault();
-                    isMiniPlayerSwiping = true; // スワイプ状態オン（クリック無効化用）
-                    miniPlayer.style.transform = `translateX(${diffX}px)`;
-                } else if (Math.abs(diffY) > Math.abs(diffX)) {
-                    isMiniDragging = false;
-                    miniPlayer.style.transition = 'transform 0.3s ease';
-                    miniPlayer.style.transform = `translateX(0)`;
-                }
+            const miniSwipeArea = document.getElementById('mini-swipe-area'); const miniContentWrapper = document.getElementById('mini-content-wrapper');
+            let mStartX = 0, mStartY = 0, isMiniDragging = false;
+            miniSwipeArea.addEventListener('touchstart', (e) => { mStartX = e.touches[0].clientX; mStartY = e.touches[0].clientY; isMiniDragging = true; isMiniPlayerSwiping = false; miniContentWrapper.style.transition = 'none'; }, { passive: true });
+            miniSwipeArea.addEventListener('touchmove', (e) => {
+                if (!isMiniDragging) return; const diffX = e.touches[0].clientX - mStartX; const diffY = e.touches[0].clientY - mStartY;
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) { e.preventDefault(); isMiniPlayerSwiping = true; miniContentWrapper.style.transform = `translateX(${diffX}px)`; } 
+                else if (Math.abs(diffY) > Math.abs(diffX)) { isMiniDragging = false; miniContentWrapper.style.transition = 'transform 0.3s ease'; miniContentWrapper.style.transform = `translateX(0)`; }
             }, { passive: false });
-
-            miniPlayer.addEventListener('touchend', (e) => {
-                if (!isMiniDragging) return;
-                isMiniDragging = false;
-                
-                const diffX = e.changedTouches[0].clientX - mStartX;
-                const threshold = window.innerWidth * 0.25;
-
+            miniSwipeArea.addEventListener('touchend', (e) => {
+                if (!isMiniDragging) return; isMiniDragging = false; const diffX = e.changedTouches[0].clientX - mStartX; const threshold = miniSwipeArea.offsetWidth * 0.3;
                 if (isMiniPlayerSwiping) {
                     if (diffX < -threshold) {
-                        // 左スワイプ -> 次の曲
-                        miniPlayer.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-                        miniPlayer.style.transform = `translateX(-100vw)`;
-                        miniPlayer.style.opacity = '0';
-                        setTimeout(() => {
-                            forceNextTrack();
-                            miniPlayer.style.transition = 'none';
-                            miniPlayer.style.transform = `translateX(100vw)`;
-                            void miniPlayer.offsetWidth;
-                            miniPlayer.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
-                            miniPlayer.style.transform = `translateX(0)`;
-                            miniPlayer.style.opacity = '1';
-                            setTimeout(() => isMiniPlayerSwiping = false, 50); // クリックガード解除
-                        }, 200);
+                        miniContentWrapper.style.transition = 'transform 0.2s ease, opacity 0.2s ease'; miniContentWrapper.style.transform = `translateX(-100%)`; miniContentWrapper.style.opacity = '0';
+                        setTimeout(() => { forceNextTrack(); miniContentWrapper.style.transition = 'none'; miniContentWrapper.style.transform = `translateX(100%)`; void miniContentWrapper.offsetWidth; miniContentWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease'; miniContentWrapper.style.transform = `translateX(0)`; miniContentWrapper.style.opacity = '1'; setTimeout(() => isMiniPlayerSwiping = false, 50); }, 200);
                     } else if (diffX > threshold) {
-                        // 右スワイプ -> 前の曲
-                        miniPlayer.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
-                        miniPlayer.style.transform = `translateX(100vw)`;
-                        miniPlayer.style.opacity = '0';
-                        setTimeout(() => {
-                            forcePrevTrack();
-                            miniPlayer.style.transition = 'none';
-                            miniPlayer.style.transform = `translateX(-100vw)`;
-                            void miniPlayer.offsetWidth;
-                            miniPlayer.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease';
-                            miniPlayer.style.transform = `translateX(0)`;
-                            miniPlayer.style.opacity = '1';
-                            setTimeout(() => isMiniPlayerSwiping = false, 50);
-                        }, 200);
-                    } else {
-                        // 戻る
-                        miniPlayer.style.transition = 'transform 0.3s ease';
-                        miniPlayer.style.transform = `translateX(0)`;
-                        setTimeout(() => isMiniPlayerSwiping = false, 50);
-                    }
+                        miniContentWrapper.style.transition = 'transform 0.2s ease, opacity 0.2s ease'; miniContentWrapper.style.transform = `translateX(100%)`; miniContentWrapper.style.opacity = '0';
+                        setTimeout(() => { forcePrevTrack(); miniContentWrapper.style.transition = 'none'; miniContentWrapper.style.transform = `translateX(-100%)`; void miniContentWrapper.offsetWidth; miniContentWrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease'; miniContentWrapper.style.transform = `translateX(0)`; miniContentWrapper.style.opacity = '1'; setTimeout(() => isMiniPlayerSwiping = false, 50); }, 200);
+                    } else { miniContentWrapper.style.transition = 'transform 0.3s ease'; miniContentWrapper.style.transform = `translateX(0)`; setTimeout(() => isMiniPlayerSwiping = false, 50); }
                 }
             });
 
-            // 画面を閉じるための共通縦スワイプ監視
             function addVerticalSwipeListener(element, onSwipeDown) {
-                let sY = 0, isT = false;
-                element.addEventListener('touchstart', e => { sY = e.touches[0].clientY; isT = true; }, { passive: true });
+                let sY = 0, sX = 0, isT = false;
+                element.addEventListener('touchstart', e => { sY = e.touches[0].clientY; sX = e.touches[0].clientX; isT = true; }, { passive: true });
                 element.addEventListener('touchmove', e => {
-                    if (!isT) return;
-                    const cY = e.touches[0].clientY;
-                    if (cY - sY > 80) { // 下スワイプ判定
-                        onSwipeDown();
-                        isT = false;
-                    }
+                    if (!isT) return; const cY = e.touches[0].clientY, cX = e.touches[0].clientX;
+                    if (Math.abs(cX - sX) > Math.abs(cY - sY)) return;
+                    const scrollable = e.target.closest('.overflow-y-auto'); if (scrollable && scrollable.scrollTop > 0) return;
+                    if (cY - sY > 80) { onSwipeDown(); isT = false; }
                 }, { passive: true });
                 element.addEventListener('touchend', () => { isT = false; });
             }
 
-            // 余白等のスワイプでフルプレイヤーを閉じる（横スワイプ時は発火しない）
-            const fullPlayer = document.getElementById('full-player');
-            addVerticalSwipeListener(fullPlayer, () => toggleFullPlayer(false));
-
-            const queueView = document.getElementById('queue-view');
-            addVerticalSwipeListener(queueView, () => toggleQueueView(false));
+            addVerticalSwipeListener(document.getElementById('full-player'), () => toggleFullPlayer(false));
+            addVerticalSwipeListener(document.getElementById('queue-view'), () => toggleQueueView(false));
+            addVerticalSwipeListener(document.getElementById('lyrics-view'), () => toggleLyricsView(false));
         }
 
-        // Media Session API (ロック画面での操作対応)
         function updateMediaSession() {
             if ('mediaSession' in navigator && currentIdx !== -1) {
                 const t = tracks[currentIdx];
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: t.title,
-                    artist: t.artist,
-                    artwork: [
-                        { src: t.img, sizes: '96x96', type: 'image/png' },
-                        { src: t.img, sizes: '512x512', type: 'image/png' },
-                    ]
-                });
-                navigator.mediaSession.setActionHandler('play', () => audio.play());
-                navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-                navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack());
-                navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
+                navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, artwork: [ { src: t.img, sizes: '96x96', type: 'image/png' }, { src: t.img, sizes: '512x512', type: 'image/png' }, ] });
+                navigator.mediaSession.setActionHandler('play', () => audio.play()); navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+                navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
             }
         }
 
-        // アプリの初期化
         initLibrary();
         setupSwipeEvents();
     </script>
