@@ -208,22 +208,310 @@
 
     <script>
         const tracks = [
-            { 
-                id: 1, 
-                title: "ラピスラズリ", 
-                artist: "応援曲・廃盤", 
-                img: "img/iconcheer.png", 
-                color: "#4a1c1c",
-                src: "songs/ラピスラズリ.mp3"
-            },
-            { 
-                id: 2, 
-                title: "エル・クンバンチェロ", 
-                artist: "高校野球・熱風", 
-                img: "img/iconcheer.png", 
-                color: "#1c3a4a",
-                src: "songs/erukun.mp3"
-            }
+        { 
+            id: 1, 
+            title: "校歌", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/1.mp3"
+        },
+        { 
+            id: 2, 
+            title: "応援歌", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/2.mp3"
+        },
+        { 
+            id: 3, 
+            title: "第二応援歌", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/3.mp3"
+        },
+        { 
+            id: 4, 
+            title: "突撃のテーマ〜ダッシュ常総", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/4.mp3"
+        },
+        { 
+            id: 5, 
+            title: "大進撃", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/5.mp3"
+        },
+        { 
+            id: 6, 
+            title: "コンバットマーチ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/6.mp3"
+        },
+        { 
+            id: 7, 
+            title: "狼少年ケン", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/7.mp3"
+        },
+        { 
+            id: 8, 
+            title: "狙い撃ち", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/8.mp3"
+        },
+        { 
+            id: 9, 
+            title: "サウスポー", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/9.mp3"
+        },
+        { 
+            id: 10, 
+            title: "カメハメハ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/10.mp3"
+        },
+        { 
+            id: 11, 
+            title: "ブラジル", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/11.mp3"
+        },
+        { 
+            id: 12, 
+            title: "アルプスチャンス", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/12.mp3"
+        },
+        { 
+            id: 13, 
+            title: "チャンス常総", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/13.mp3"
+        },
+        { 
+            id: 14, 
+            title: "See Off", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/14.mp3"
+        },
+        { 
+            id: 15, 
+            title: "睡蓮花", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/15.mp3"
+        },
+        { 
+            id: 16, 
+            title: "ベイブリーズ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/16.mp3"
+        },
+        { 
+            id: 17, 
+            title: "F1", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/17.mp3"
+        },
+        { 
+            id: 18, 
+            title: "ヒットマーチ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/18.mp3"
+        },
+        { 
+            id: 19, 
+            title: "常総節", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/19.mp3"
+        },
+        { 
+            id: 20, 
+            title: "ワルキューレ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/20.mp3"
+        },
+        { 
+            id: 21, 
+            title: "神風", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/21.mp3"
+        },
+        { 
+            id: 22, 
+            title: "エル・クンバンチェロ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/22.mp3"
+        },
+        { 
+            id: 23, 
+            title: "もののふ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/23.mp3"
+        },
+        { 
+            id: 24, 
+            title: "ももクロ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/24.mp3"
+        },
+        { 
+            id: 25, 
+            title: "レーヴ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/25.mp3"
+        },
+        { 
+            id: 26, 
+            title: "グラディエーター", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/26.mp3"
+        },
+        { 
+            id: 27, 
+            title: "Newヒットマーチ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/27.mp3"
+        },
+        { 
+            id: 28, 
+            title: "Newヒットマーチ〜常総節", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/28.mp3"
+        },
+        { 
+            id: 29, 
+            title: "かっせーパワプロ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/29.mp3"
+        },
+        { 
+            id: 30, 
+            title: "パワフルシンフォニー", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/30.mp3"
+        },
+        { 
+            id: 31, 
+            title: "校歌歌詞入り", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/31.mp3"
+        },
+        { 
+            id: 32, 
+            title: "ビクトリーSeeOff", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/32.mp3"
+        },
+        { 
+            id: 33, 
+            title: "もののふ改", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/33.mp3"
+        },
+        { 
+            id: 34, 
+            title: "吹奏楽", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/34.mp3"
+        },
+        { 
+            id: 35, 
+            title: "ラピスラズリ", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/35.mp3"
+        },
+        { 
+            id: 36, 
+            title: "新ビクトリーSeeOff", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/36.mp3"
+        },
+        { 
+            id: 37, 
+            title: "燃えろ闘魂", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/37.mp3"
+        },
+        { 
+            id: 38, 
+            title: "春風", 
+            artist: "常総学院高等学校応援団", 
+            img: "img/iconcheer.png", 
+            color: "#4a1c1c",
+            src: "songs/38.mp3"
+        }
         ];
 
         let currentIdx = -1;
