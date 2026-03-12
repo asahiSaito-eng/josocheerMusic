@@ -1,2 +1,821 @@
-「曲が終わったら自動で次の曲に進むようにしたい」
 「背景画像を現在再生中の曲のジャケットに合わせたい」
+
+3. アートワーク(img)を右スワイプで次、左スワイプで前,4. ミニプレイヤーを右スワイプで次、左スワイプで前を左スワイプで次、右スワイプで次にしてください。スワイプするときは巻き戻しの挙動で、5秒未満の場合は前の曲に戻るを無効化してください。
+また、アートワーク、ミニプレイヤーをスワイプするとき、動かないのではなく、スワイプと連動して、アートワーク、ミニプレーヤーを動かしてください。（youtumemusicでできる紙芝居のような感じで）
+最後に、アートワークの下のマージンを少し広くし、画面下部のリストアイコンの下のマージンを広くした分狭くしてください。
+
+
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jmusic</title>
+    
+    <!-- PWA用設定 -->
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="img/iconcheer.png">
+    <link rel="manifest" href="manifest.json">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { 
+            background: #000; 
+            color: #fff; 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            overflow: hidden; 
+            height: 100vh; 
+        }
+        
+        .glass { 
+            background: rgba(255, 255, 255, 0.1); 
+            backdrop-filter: blur(20px); 
+            -webkit-backdrop-filter: blur(20px); 
+            border: 1px solid rgba(255, 255, 255, 0.1); 
+        }
+        
+        .player-view { 
+            transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); 
+        }
+
+        /* --- Apple Music風 モダンシークバー --- */
+        .seek-container {
+            position: relative;
+            height: 28px; /* タッチしやすい高さを確保 */
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        /* 背景トラック */
+        .seek-track-bg {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            overflow: hidden;
+            transition: transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* 進行状況バー */
+        .seek-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: #fff;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        /* 見えないネイティブスライダー（操作用） */
+        input[type="range"] { 
+            -webkit-appearance: none; 
+            appearance: none; 
+            background: transparent; 
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            z-index: 10;
+            margin: 0;
+            cursor: pointer;
+        }
+        input[type="range"]:focus { outline: none; }
+        input[type="range"]::-webkit-slider-runnable-track { 
+            width: 100%; height: 100%; background: transparent; border: none; 
+        }
+        /* ツマミ（丸）を透明にして隠す */
+        input[type="range"]::-webkit-slider-thumb { 
+            -webkit-appearance: none; 
+            appearance: none; 
+            height: 28px; 
+            width: 28px; 
+            border-radius: 50%; 
+            background: transparent; 
+            cursor: pointer;
+        }
+
+        /* ループ範囲の薄い赤帯 */
+        #loop-visual-bar {
+            position: absolute;
+            height: 6px;
+            background: rgba(239, 68, 68, 0.35); /* Tailwind red-500 薄め */
+            border-radius: 3px;
+            z-index: 5;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* ループの赤い縦線マーカー */
+        .loop-marker {
+            position: absolute;
+            width: 3px;
+            height: 14px;
+            background: #ef4444; /* Tailwind red-500 */
+            border-radius: 2px;
+            z-index: 6;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 0 6px rgba(0,0,0,0.6);
+        }
+
+        /* 操作時（ドラッグ時）にバーを少し太くする演出 */
+        .seek-container:active .seek-track-bg,
+        .seek-container:active #loop-visual-bar {
+            transform: translateY(-50%) scaleY(1.4);
+        }
+        .seek-container:active .loop-marker {
+            transform: translate(-50%, -50%) scaleY(1.2);
+        }
+        /* --------------------------------- */
+
+        .active-song-item {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 3px solid #ef4444;
+        }
+
+        /* Apple Musicスタイルのフッターアイコン */
+        .footer-icon-btn {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .footer-icon-btn:active {
+            transform: scale(0.9);
+            opacity: 0.6;
+        }
+
+        .control-btn {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .control-btn.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
+        }
+
+        /* スクロールバー非表示 (Queue画面用) */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- 背景のぼかし -->
+    <div id="bg-blur" class="fixed inset-0 z-[-1] opacity-40 blur-[80px] scale-150 transition-all duration-1000"></div>
+
+    <!-- ライブラリ画面 -->
+    <main class="flex-1 overflow-y-auto px-5 pt-16 pb-32">
+        <h1 class="text-3xl font-bold mb-6">ライブラリ</h1>
+        
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
+                <i class="fas fa-music text-red-500 text-2xl"></i>
+                <span class="font-bold">プレイリスト</span>
+            </div>
+            <div class="glass p-4 rounded-2xl flex flex-col gap-2 active:scale-95 transition-transform cursor-pointer">
+                <i class="fas fa-heart text-pink-500 text-2xl"></i>
+                <span class="font-bold">お気に入り</span>
+            </div>
+        </div>
+
+        <h2 class="text-xl font-bold mb-4 text-white/60">すべての曲</h2>
+        <div id="song-list" class="space-y-1">
+            <!-- 動的に生成されます -->
+        </div>
+    </main>
+
+    <!-- ミニプレーヤー -->
+    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-40 shadow-2xl transition-opacity duration-300" onclick="toggleFullPlayer(true)">
+        <img id="mini-img" src="" class="w-11 h-11 rounded-lg object-cover bg-white/10">
+        <div class="flex-1 ml-3 min-w-0">
+            <div id="mini-title" class="text-sm font-semibold truncate">曲を選択してください</div>
+            <div id="mini-artist" class="text-[11px] text-white/40 truncate">-</div>
+        </div>
+        <div class="flex items-center gap-4 px-2" onclick="event.stopPropagation()">
+            <button onclick="handlePlayPause()" class="w-8 h-8 flex items-center justify-center"><i id="mini-play-btn" class="fas fa-play text-xl"></i></button>
+            <button onclick="handleNext()" class="w-8 h-8 flex items-center justify-center"><i class="fas fa-forward text-lg"></i></button>
+        </div>
+    </div>
+
+    <!-- フルプレーヤー画面 -->
+    <div id="full-player" class="fixed inset-0 z-[50] player-view translate-y-full bg-black/95 flex flex-col px-8 pb-12 pt-4">
+        <!-- 閉じるハンドル -->
+        <div class="w-full flex justify-center py-4" onclick="toggleFullPlayer(false)">
+            <div class="w-10 h-1.5 bg-white/20 rounded-full"></div>
+        </div>
+
+        <!-- アートワークエリア -->
+        <div id="full-img-container" class="flex-1 flex items-center justify-center overflow-hidden w-full">
+            <img id="full-img" src="" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-2xl transition-all duration-500 scale-90">
+        </div>
+
+        <!-- タイトルエリア -->
+        <div class="mb-6">
+            <div class="w-full">
+                <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
+                <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
+            </div>
+            
+            <!-- ループコントロールコンテナ -->
+            <div class="flex items-center justify-between mt-4">
+                <div class="flex items-center gap-2">
+                    <button id="btn-loop-toggle" onclick="toggleLoopMode()" class="control-btn">LOOP</button>
+                    <button id="btn-loop-start" onclick="setLoopStart()" class="control-btn">START</button>
+                    <button id="btn-loop-finish" onclick="setLoopFinish()" class="control-btn">FINISH</button>
+                </div>
+                <!-- ループモードのステータスインジケーター -->
+                <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right">LOOP ACTIVE</div>
+            </div>
+        </div>
+
+        <!-- 進捗バー（モダンUI＆ループビジュアライザー付き） -->
+        <div class="mb-8">
+            <div class="seek-container">
+                <div class="seek-track-bg">
+                    <div id="seek-progress" class="seek-progress"></div>
+                </div>
+                <div id="loop-visual-bar"></div>
+                <!-- ループの赤い縦線 -->
+                <div id="loop-marker-start" class="loop-marker"></div>
+                <div id="loop-marker-finish" class="loop-marker"></div>
+                
+                <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
+            </div>
+            <div class="flex justify-between text-[11px] font-bold text-white/30 mt-2">
+                <span id="time-curr">0:00</span>
+                <span id="time-total">0:00</span>
+            </div>
+        </div>
+
+        <!-- メインコントロール -->
+        <div class="flex justify-around items-center mb-10">
+            <button onclick="handlePrev()" class="text-3xl active:scale-90 transition-transform"><i class="fas fa-backward"></i></button>
+            <button onclick="handlePlayPause()" class="text-6xl w-24 active:scale-95 transition-transform"><i id="full-play-btn" class="fas fa-play"></i></button>
+            <button onclick="handleNext()" class="text-3xl active:scale-90 transition-transform"><i class="fas fa-forward"></i></button>
+        </div>
+
+        <!-- フッターアクション -->
+        <div id="full-footer" class="flex justify-around items-center px-4 text-white/40 text-xl mb-4 h-16 w-full">
+            <button id="btn-queue-toggle" onclick="onQueueButtonClick()" class="footer-icon-btn">
+                <i class="fas fa-list-ul"></i>
+            </button>
+            <button id="btn-lyrics-toggle" onclick="onLyricsButtonClick()" class="footer-icon-btn">
+                <i class="fas fa-quote-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- キュー（再生リスト）画面 -->
+    <div id="queue-view" class="fixed inset-0 z-[60] player-view translate-y-full bg-black/95 flex flex-col backdrop-blur-3xl">
+        <!-- キュー画面用上部ミニプレイヤー (タップでフルプレーヤーへ戻る) -->
+        <div id="queue-mini-player" class="h-16 flex items-center px-4 bg-white/10 shrink-0 cursor-pointer active:bg-white/20 transition-colors" onclick="toggleQueueView(false)">
+            <img id="queue-mini-img" src="" class="w-10 h-10 rounded object-cover">
+            <div class="flex-1 ml-3 min-w-0">
+                <div id="queue-mini-title" class="text-sm font-semibold truncate">曲名</div>
+                <div id="queue-mini-artist" class="text-[11px] text-white/40 truncate">アーティスト</div>
+            </div>
+            <div class="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">
+                <i class="fas fa-chevron-down text-sm"></i>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4 px-6 pt-6 shrink-0">
+            <h2 class="text-2xl font-bold">次に再生</h2>
+        </div>
+        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 px-4 pb-10">
+            <!-- 動的に生成されます -->
+        </div>
+    </div>
+
+    <audio id="audio-element"></audio>
+
+    <script>
+        const tracks = [
+            { id: 1, title: "校歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/1.mp3" },
+            { id: 2, title: "応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/2.mp3" },
+            { id: 3, title: "第二応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/3.mp3" },
+            { id: 4, title: "突撃のテーマ〜ダッシュ常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/4.mp3" },
+            { id: 5, title: "大進撃", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/5.mp3" },
+            { id: 6, title: "コンバットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/6.mp3" },
+            { id: 7, title: "狼少年ケン", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/7.mp3" },
+            { id: 8, title: "狙い撃ち", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/8.mp3" },
+            { id: 9, title: "サウスポー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/9.mp3" },
+            { id: 10, title: "カメハメハ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/10.mp3" },
+            { id: 11, title: "ブラジル", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/11.mp3" },
+            { id: 12, title: "アルプスチャンス", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/12.mp3" },
+            { id: 13, title: "チャンス常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/13.mp3" },
+            { id: 14, title: "See Off", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/14.mp3" },
+            { id: 15, title: "睡蓮花", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/15.mp3" },
+            { id: 16, title: "ベイブリーズ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/16.mp3" },
+            { id: 17, title: "F1", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/17.mp3" },
+            { id: 18, title: "ヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/18.mp3" },
+            { id: 19, title: "常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/19.mp3" },
+            { id: 20, title: "ワルキューレ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/20.mp3" },
+            { id: 21, title: "神風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/21.mp3" },
+            { id: 22, title: "エル・クンバンチェロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/22.mp3" },
+            { id: 23, title: "もののふ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/23.mp3" },
+            { id: 24, title: "ももクロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/24.mp3" },
+            { id: 25, title: "レーヴ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/25.mp3" },
+            { id: 26, title: "グラディエーター", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/26.mp3" },
+            { id: 27, title: "Newヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/27.mp3" },
+            { id: 28, title: "Newヒットマーチ〜常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/28.mp3" },
+            { id: 29, title: "かっせーパワプロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/29.mp3" },
+            { id: 30, title: "パワフルシンフォニー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/30.mp3" },
+            { id: 31, title: "校歌歌詞入り", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/31.mp3" },
+            { id: 32, title: "ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/32.mp3" },
+            { id: 33, title: "もののふ改", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/33.mp3" },
+            { id: 34, title: "吹奏楽", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/34.mp3" },
+            { id: 35, title: "ラピスラズリ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/35.mp3" },
+            { id: 36, title: "新ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/36.mp3" },
+            { id: 37, title: "燃えろ闘魂", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/37.mp3" },
+            { id: 38, title: "春風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/38.mp3" }
+        ];
+
+        let currentIdx = -1;
+        let isLooping = false; 
+        let loopStartTime = null;
+        let loopFinishTime = null;
+        const audio = document.getElementById('audio-element');
+
+        function onLyricsButtonClick() { console.log("Lyrics feature"); }
+        
+        function onQueueButtonClick() { 
+            toggleQueueView(true);
+        }
+
+        function toggleQueueView(show) {
+            const queueView = document.getElementById('queue-view');
+            const queueBtn = document.getElementById('btn-queue-toggle');
+            
+            if (show) {
+                renderQueueList();
+                queueView.style.transform = "translateY(0)";
+                if(queueBtn) {
+                    queueBtn.classList.add('text-white');
+                    queueBtn.classList.remove('text-white/40');
+                }
+            } else {
+                queueView.style.transform = "translateY(100%)";
+                if(queueBtn) {
+                    queueBtn.classList.remove('text-white');
+                    queueBtn.classList.add('text-white/40');
+                }
+            }
+        }
+
+        function renderQueueList() {
+            const container = document.getElementById('queue-list');
+            container.innerHTML = '';
+            
+            tracks.forEach((t, i) => {
+                const isActive = (i === currentIdx);
+                const div = document.createElement('div');
+                div.id = `queue-item-${i}`;
+                
+                div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${
+                    isActive 
+                    ? 'bg-white/10 border-l-4 border-red-500' 
+                    : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'
+                }`;
+                
+                div.onclick = () => {
+                    playTrack(i);
+                    // ここで自動で閉じないように toggleQueueView(false) を削除
+                };
+                
+                div.innerHTML = `
+                    <div class="w-10 h-10 relative flex-shrink-0">
+                        <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover">
+                        ${isActive ? `
+                        <div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center">
+                            <i class="fas fa-volume-up text-white text-xs"></i>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
+                        <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            if (currentIdx !== -1) {
+                setTimeout(() => {
+                    const activeItem = document.getElementById(`queue-item-${currentIdx}`);
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+        }
+
+        function initLibrary() {
+            const listContainer = document.getElementById('song-list');
+            listContainer.innerHTML = '';
+            tracks.forEach((t, i) => {
+                const div = document.createElement('div');
+                div.id = `song-item-${i}`;
+                div.className = "flex items-center gap-3 py-3 px-2 rounded-xl border-b border-white/5 active:bg-white/5 cursor-pointer transition-colors";
+                div.onclick = () => {
+                    playTrack(i);
+                    toggleFullPlayer(true);
+                };
+                div.innerHTML = `
+                    <img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-lg">
+                    <div class="min-w-0">
+                        <div class="text-sm font-semibold truncate">${t.title}</div>
+                        <div class="text-[10px] text-white/40">${t.artist}</div>
+                    </div>
+                `;
+                listContainer.appendChild(div);
+            });
+        }
+
+        function playTrack(idx) {
+            if (idx === currentIdx && !audio.paused) return;
+            
+            if (currentIdx !== -1) {
+                const prevSongItem = document.getElementById(`song-item-${currentIdx}`);
+                if (prevSongItem) prevSongItem.classList.remove('active-song-item');
+            }
+
+            currentIdx = idx;
+            const t = tracks[idx];
+            audio.src = t.src;
+            
+            const newSongItem = document.getElementById(`song-item-${idx}`);
+            if (newSongItem) newSongItem.classList.add('active-song-item');
+            
+            document.getElementById('mini-title').innerText = t.title;
+            document.getElementById('full-title').innerText = t.title;
+            document.getElementById('mini-artist').innerText = t.artist;
+            document.getElementById('full-artist').innerText = t.artist;
+            document.getElementById('mini-img').src = t.img;
+            document.getElementById('full-img').src = t.img;
+            document.getElementById('bg-blur').style.backgroundColor = t.color;
+            
+            // キュー画面上部のミニプレイヤーも更新
+            document.getElementById('queue-mini-title').innerText = t.title;
+            document.getElementById('queue-mini-artist').innerText = t.artist;
+            document.getElementById('queue-mini-img').src = t.img;
+            
+            // シークバーの表示をリセット
+            document.getElementById('seek-progress').style.width = '0%';
+            document.getElementById('seek-bar').value = 0;
+
+            resetLoopState(); 
+            audio.play();
+            updateMediaSession();
+            updatePlayButtonIcons();
+
+            const queueView = document.getElementById('queue-view');
+            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
+                renderQueueList();
+            }
+        }
+
+        // --- ループ機能 ---
+        function setLoopStart() {
+            loopStartTime = audio.currentTime;
+            isLooping = true;
+            updateLoopUI();
+        }
+
+        function setLoopFinish() {
+            if (loopStartTime === null) loopStartTime = 0;
+            loopFinishTime = audio.currentTime;
+            isLooping = true;
+            if (loopFinishTime < loopStartTime) {
+                [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime];
+            }
+            updateLoopUI();
+        }
+
+        function toggleLoopMode() {
+            if (isLooping) {
+                resetLoopState();
+            } else {
+                isLooping = true;
+            }
+            updateLoopUI();
+        }
+
+        function resetLoopState() {
+            isLooping = false;
+            loopStartTime = null;
+            loopFinishTime = null;
+            updateLoopUI();
+        }
+
+        function updateLoopUI() {
+            const btnToggle = document.getElementById('btn-loop-toggle');
+            const btnStart = document.getElementById('btn-loop-start');
+            const btnFinish = document.getElementById('btn-loop-finish');
+            const indicator = document.getElementById('loop-indicator');
+            const visualBar = document.getElementById('loop-visual-bar');
+            const markerStart = document.getElementById('loop-marker-start');
+            const markerFinish = document.getElementById('loop-marker-finish');
+
+            btnToggle.classList.toggle('active', isLooping);
+            btnStart.classList.toggle('active', loopStartTime !== null);
+            btnFinish.classList.toggle('active', loopFinishTime !== null);
+
+            if (isLooping) {
+                indicator.style.opacity = "1";
+                updateLoopVisualBar(); // マーカーとバーの配置更新
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    indicator.innerText = "A-B LOOP ACTIVE";
+                } else {
+                    indicator.innerText = "SINGLE TRACK LOOP ACTIVE";
+                }
+            } else {
+                indicator.style.opacity = "0";
+                visualBar.style.opacity = "0";
+                markerStart.style.opacity = "0";
+                markerFinish.style.opacity = "0";
+            }
+        }
+
+        function updateLoopVisualBar() {
+            const visualBar = document.getElementById('loop-visual-bar');
+            const markerStart = document.getElementById('loop-marker-start');
+            const markerFinish = document.getElementById('loop-marker-finish');
+
+            if (audio.duration) {
+                // START マーカー表示
+                if (loopStartTime !== null) {
+                    const startPercent = (loopStartTime / audio.duration) * 100;
+                    markerStart.style.left = startPercent + "%";
+                    markerStart.style.opacity = "1";
+                } else {
+                    markerStart.style.opacity = "0";
+                }
+
+                // FINISH マーカー表示
+                if (loopFinishTime !== null) {
+                    const endPercent = (loopFinishTime / audio.duration) * 100;
+                    markerFinish.style.left = endPercent + "%";
+                    markerFinish.style.opacity = "1";
+                } else {
+                    markerFinish.style.opacity = "0";
+                }
+
+                // 範囲の赤い帯表示
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    const startPercent = (loopStartTime / audio.duration) * 100;
+                    const endPercent = (loopFinishTime / audio.duration) * 100;
+                    visualBar.style.left = startPercent + "%";
+                    visualBar.style.width = (endPercent - startPercent) + "%";
+                    visualBar.style.opacity = "1";
+                } else {
+                    visualBar.style.opacity = "0";
+                }
+            }
+        }
+
+        audio.ontimeupdate = () => {
+            if (currentIdx === -1) return;
+            
+            // ループ制御
+            if (isLooping) {
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    if (audio.currentTime >= loopFinishTime) {
+                        audio.currentTime = loopStartTime;
+                    }
+                } else {
+                    if (audio.currentTime >= audio.duration - 0.2) {
+                        audio.currentTime = 0;
+                        audio.play();
+                    }
+                }
+            }
+
+            if (!isNaN(audio.duration)) {
+                const bar = document.getElementById('seek-bar');
+                bar.max = audio.duration;
+                bar.value = audio.currentTime;
+                
+                // モダンプログレスバーの進捗表示更新
+                const progressPercent = (audio.currentTime / audio.duration) * 100;
+                document.getElementById('seek-progress').style.width = progressPercent + '%';
+
+                document.getElementById('time-curr').innerText = formatTime(audio.currentTime);
+                document.getElementById('time-total').innerText = formatTime(audio.duration);
+                
+                // 動的な更新が必要な場合（ロード直後など）
+                if (isLooping) updateLoopVisualBar();
+            }
+        };
+
+        audio.onplay = () => updatePlayButtonIcons();
+        audio.onpause = () => updatePlayButtonIcons();
+        audio.onended = () => {
+            if (!isLooping) {
+                handleNext();
+            } else if (loopStartTime === null || loopFinishTime === null) {
+                audio.currentTime = 0;
+                audio.play();
+            }
+        };
+
+        function handlePlayPause() {
+            if (currentIdx === -1) { playTrack(0); return; }
+            if (audio.paused) audio.play(); else audio.pause();
+        }
+
+        function updatePlayButtonIcons() {
+            const miniIcon = document.getElementById('mini-play-btn');
+            const fullIcon = document.getElementById('full-play-btn');
+            const isPaused = audio.paused;
+            miniIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
+            fullIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
+            document.getElementById('full-img').style.transform = isPaused ? "scale(0.85)" : "scale(1.0)";
+        }
+
+        function handleNext() { 
+            playTrack((currentIdx + 1) % tracks.length); 
+        }
+        
+        // 巻き戻しボタンの挙動を変更
+        function handlePrev() { 
+            if (currentIdx === -1) return;
+            
+            // 再生時間が5秒以上の場合は曲の先頭に戻る
+            if (audio.currentTime >= 5.0) {
+                audio.currentTime = 0;
+            } else {
+                // 5秒未満の場合は前の曲に戻る
+                playTrack((currentIdx - 1 + tracks.length) % tracks.length); 
+            }
+        }
+        
+        function handleSeek(v) { 
+            audio.currentTime = v; 
+            if (!isNaN(audio.duration)) {
+                const progressPercent = (v / audio.duration) * 100;
+                document.getElementById('seek-progress').style.width = progressPercent + '%';
+            }
+        }
+
+        function toggleFullPlayer(show) {
+            const player = document.getElementById('full-player');
+            const mini = document.getElementById('mini-player');
+            player.style.transform = show ? "translateY(0)" : "translateY(100%)";
+            mini.style.opacity = show ? "0" : "1";
+            mini.style.pointerEvents = show ? "none" : "auto";
+        }
+
+        function formatTime(s) {
+            if (isNaN(s)) return "0:00";
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60);
+            return `${m}:${sec < 10 ? '0' + sec : sec}`;
+        }
+
+        // スワイプイベントの設定
+        function setupSwipeEvents() {
+            function addSwipeListener(element, options) {
+                let startX = 0;
+                let startY = 0;
+                let isTouching = false;
+
+                element.addEventListener('touchstart', e => {
+                    // シークバーやボタン上のスワイプは無視する
+                    let target = e.target;
+                    while (target && target !== element) {
+                        if (target.tagName.toLowerCase() === 'button' || target.tagName.toLowerCase() === 'input') {
+                            return;
+                        }
+                        target = target.parentNode;
+                    }
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    isTouching = true;
+                }, { passive: true });
+
+                element.addEventListener('touchend', e => {
+                    if (!isTouching) return;
+                    isTouching = false;
+                    
+                    let endX = e.changedTouches[0].clientX;
+                    let endY = e.changedTouches[0].clientY;
+                    
+                    let diffX = endX - startX;
+                    let diffY = endY - startY;
+                    
+                    let absDiffX = Math.abs(diffX);
+                    let absDiffY = Math.abs(diffY);
+                    
+                    const threshold = 40; // スワイプ判定のしきい値
+                    
+                    if (Math.max(absDiffX, absDiffY) > threshold) {
+                        if (absDiffX > absDiffY) {
+                            // 横方向のスワイプ
+                            if (diffX > 0 && options.onSwipeRight) options.onSwipeRight();
+                            else if (diffX < 0 && options.onSwipeLeft) options.onSwipeLeft();
+                        } else {
+                            // 縦方向のスワイプ
+                            if (diffY > 0 && options.onSwipeDown) options.onSwipeDown();
+                            else if (diffY < 0 && options.onSwipeUp) options.onSwipeUp();
+                        }
+                    }
+                });
+            }
+
+            // 1. 画面下部を上にスワイプでリスト表示
+            const fullFooter = document.getElementById('full-footer');
+            if (fullFooter) {
+                addSwipeListener(fullFooter, {
+                    onSwipeUp: () => toggleQueueView(true)
+                });
+            }
+
+            // 2. フルプレーヤーを上から下にスワイプでミニプレイヤー化
+            const fullPlayer = document.getElementById('full-player');
+            if (fullPlayer) {
+                addSwipeListener(fullPlayer, {
+                    onSwipeDown: () => toggleFullPlayer(false)
+                });
+            }
+
+            // 3. アートワーク(img)を右スワイプで次、左スワイプで前
+            const fullImgContainer = document.getElementById('full-img-container');
+            if (fullImgContainer) {
+                addSwipeListener(fullImgContainer, {
+                    onSwipeRight: () => handleNext(),
+                    onSwipeLeft: () => handlePrev()
+                });
+            }
+
+            // 4. ミニプレイヤーを右スワイプで次、左スワイプで前
+            const miniPlayer = document.getElementById('mini-player');
+            if (miniPlayer) {
+                addSwipeListener(miniPlayer, {
+                    onSwipeRight: () => handleNext(),
+                    onSwipeLeft: () => handlePrev()
+                });
+            }
+        }
+
+        function updateMediaSession() {
+            if ('mediaSession' in navigator) {
+                const t = tracks[currentIdx];
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: t.title,
+                    artist: t.artist,
+                    artwork: [{ src: t.img, sizes: '512x512', type: 'image/png' }]
+                });
+                navigator.mediaSession.setActionHandler('play', () => handlePlayPause());
+                navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
+                navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
+                navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+            }
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker 登録成功:', reg.scope))
+                    .catch(err => console.log('Service Worker 登録失敗:', err));
+            });
+        }
+
+        window.onload = () => {
+            initLibrary();
+            setupSwipeEvents();
+        };
+    </script>
+</body>
+</html>
