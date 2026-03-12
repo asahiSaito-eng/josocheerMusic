@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Victory Player</title>
+    <title>Jmusic</title>
+    
+    <!-- PWA用設定 -->
+    <meta name="theme-color" content="#000000">
+    <link rel="apple-touch-icon" href="img/iconcheer.png">
+    <link rel="manifest" href="manifest.json">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -102,6 +108,15 @@
             background: #fff;
             color: #000;
             border-color: #fff;
+        }
+
+        /* スクロールバー非表示 (Queue画面用) */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
     </style>
 </head>
@@ -204,314 +219,61 @@
         </div>
     </div>
 
+    <!-- キュー（再生リスト）画面 -->
+    <div id="queue-view" class="fixed inset-0 z-[60] player-view translate-y-full bg-black/95 flex flex-col pt-12 pb-8 px-4 backdrop-blur-3xl">
+        <div class="flex justify-between items-center mb-6 px-2">
+            <h2 class="text-2xl font-bold">次に再生</h2>
+            <button onclick="toggleQueueView(false)" class="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full active:scale-90 transition-transform">
+                <i class="fas fa-chevron-down text-sm"></i>
+            </button>
+        </div>
+        <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 pb-10">
+            <!-- 動的に生成されます -->
+        </div>
+    </div>
+
     <audio id="audio-element"></audio>
 
     <script>
         const tracks = [
-        { 
-            id: 1, 
-            title: "校歌", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/1.mp3"
-        },
-        { 
-            id: 2, 
-            title: "応援歌", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/2.mp3"
-        },
-        { 
-            id: 3, 
-            title: "第二応援歌", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/3.mp3"
-        },
-        { 
-            id: 4, 
-            title: "突撃のテーマ〜ダッシュ常総", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/4.mp3"
-        },
-        { 
-            id: 5, 
-            title: "大進撃", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/5.mp3"
-        },
-        { 
-            id: 6, 
-            title: "コンバットマーチ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/6.mp3"
-        },
-        { 
-            id: 7, 
-            title: "狼少年ケン", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/7.mp3"
-        },
-        { 
-            id: 8, 
-            title: "狙い撃ち", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/8.mp3"
-        },
-        { 
-            id: 9, 
-            title: "サウスポー", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/9.mp3"
-        },
-        { 
-            id: 10, 
-            title: "カメハメハ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/10.mp3"
-        },
-        { 
-            id: 11, 
-            title: "ブラジル", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/11.mp3"
-        },
-        { 
-            id: 12, 
-            title: "アルプスチャンス", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/12.mp3"
-        },
-        { 
-            id: 13, 
-            title: "チャンス常総", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/13.mp3"
-        },
-        { 
-            id: 14, 
-            title: "See Off", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/14.mp3"
-        },
-        { 
-            id: 15, 
-            title: "睡蓮花", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/15.mp3"
-        },
-        { 
-            id: 16, 
-            title: "ベイブリーズ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/16.mp3"
-        },
-        { 
-            id: 17, 
-            title: "F1", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/17.mp3"
-        },
-        { 
-            id: 18, 
-            title: "ヒットマーチ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/18.mp3"
-        },
-        { 
-            id: 19, 
-            title: "常総節", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/19.mp3"
-        },
-        { 
-            id: 20, 
-            title: "ワルキューレ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/20.mp3"
-        },
-        { 
-            id: 21, 
-            title: "神風", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/21.mp3"
-        },
-        { 
-            id: 22, 
-            title: "エル・クンバンチェロ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/22.mp3"
-        },
-        { 
-            id: 23, 
-            title: "もののふ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/23.mp3"
-        },
-        { 
-            id: 24, 
-            title: "ももクロ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/24.mp3"
-        },
-        { 
-            id: 25, 
-            title: "レーヴ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/25.mp3"
-        },
-        { 
-            id: 26, 
-            title: "グラディエーター", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/26.mp3"
-        },
-        { 
-            id: 27, 
-            title: "Newヒットマーチ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/27.mp3"
-        },
-        { 
-            id: 28, 
-            title: "Newヒットマーチ〜常総節", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/28.mp3"
-        },
-        { 
-            id: 29, 
-            title: "かっせーパワプロ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/29.mp3"
-        },
-        { 
-            id: 30, 
-            title: "パワフルシンフォニー", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/30.mp3"
-        },
-        { 
-            id: 31, 
-            title: "校歌歌詞入り", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/31.mp3"
-        },
-        { 
-            id: 32, 
-            title: "ビクトリーSeeOff", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/32.mp3"
-        },
-        { 
-            id: 33, 
-            title: "もののふ改", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/33.mp3"
-        },
-        { 
-            id: 34, 
-            title: "吹奏楽", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/34.mp3"
-        },
-        { 
-            id: 35, 
-            title: "ラピスラズリ", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/35.mp3"
-        },
-        { 
-            id: 36, 
-            title: "新ビクトリーSeeOff", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/36.mp3"
-        },
-        { 
-            id: 37, 
-            title: "燃えろ闘魂", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/37.mp3"
-        },
-        { 
-            id: 38, 
-            title: "春風", 
-            artist: "常総学院高等学校応援団", 
-            img: "img/iconcheer.png", 
-            color: "#4a1c1c",
-            src: "songs/38.mp3"
-        }
+            { id: 1, title: "校歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/1.mp3" },
+            { id: 2, title: "応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/2.mp3" },
+            { id: 3, title: "第二応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/3.mp3" },
+            { id: 4, title: "突撃のテーマ〜ダッシュ常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/4.mp3" },
+            { id: 5, title: "大進撃", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/5.mp3" },
+            { id: 6, title: "コンバットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/6.mp3" },
+            { id: 7, title: "狼少年ケン", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/7.mp3" },
+            { id: 8, title: "狙い撃ち", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/8.mp3" },
+            { id: 9, title: "サウスポー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/9.mp3" },
+            { id: 10, title: "カメハメハ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/10.mp3" },
+            { id: 11, title: "ブラジル", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/11.mp3" },
+            { id: 12, title: "アルプスチャンス", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/12.mp3" },
+            { id: 13, title: "チャンス常総", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/13.mp3" },
+            { id: 14, title: "See Off", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/14.mp3" },
+            { id: 15, title: "睡蓮花", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/15.mp3" },
+            { id: 16, title: "ベイブリーズ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/16.mp3" },
+            { id: 17, title: "F1", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/17.mp3" },
+            { id: 18, title: "ヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/18.mp3" },
+            { id: 19, title: "常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/19.mp3" },
+            { id: 20, title: "ワルキューレ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/20.mp3" },
+            { id: 21, title: "神風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/21.mp3" },
+            { id: 22, title: "エル・クンバンチェロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/22.mp3" },
+            { id: 23, title: "もののふ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/23.mp3" },
+            { id: 24, title: "ももクロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/24.mp3" },
+            { id: 25, title: "レーヴ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/25.mp3" },
+            { id: 26, title: "グラディエーター", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/26.mp3" },
+            { id: 27, title: "Newヒットマーチ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/27.mp3" },
+            { id: 28, title: "Newヒットマーチ〜常総節", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/28.mp3" },
+            { id: 29, title: "かっせーパワプロ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/29.mp3" },
+            { id: 30, title: "パワフルシンフォニー", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/30.mp3" },
+            { id: 31, title: "校歌歌詞入り", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/31.mp3" },
+            { id: 32, title: "ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/32.mp3" },
+            { id: 33, title: "もののふ改", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/33.mp3" },
+            { id: 34, title: "吹奏楽", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/34.mp3" },
+            { id: 35, title: "ラピスラズリ", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/35.mp3" },
+            { id: 36, title: "新ビクトリーSeeOff", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/36.mp3" },
+            { id: 37, title: "燃えろ闘魂", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/37.mp3" },
+            { id: 38, title: "春風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/38.mp3" }
         ];
 
         let currentIdx = -1;
@@ -521,7 +283,79 @@
         const audio = document.getElementById('audio-element');
 
         function onLyricsButtonClick() { console.log("Lyrics feature"); }
-        function onQueueButtonClick() { console.log("Queue feature"); }
+        
+        // キュー（リスト）ボタンのクリックイベント
+        function onQueueButtonClick() { 
+            toggleQueueView(true);
+        }
+
+        // キュー画面の表示・非表示を切り替える
+        function toggleQueueView(show) {
+            const queueView = document.getElementById('queue-view');
+            const queueBtn = document.getElementById('btn-queue-toggle');
+            
+            if (show) {
+                renderQueueList();
+                queueView.style.transform = "translateY(0)";
+                queueBtn.classList.add('text-white');
+                queueBtn.classList.remove('text-white/40');
+            } else {
+                queueView.style.transform = "translateY(100%)";
+                queueBtn.classList.remove('text-white');
+                queueBtn.classList.add('text-white/40');
+            }
+        }
+
+        // キューリストのレンダリング
+        function renderQueueList() {
+            const container = document.getElementById('queue-list');
+            container.innerHTML = '';
+            
+            tracks.forEach((t, i) => {
+                const isActive = (i === currentIdx);
+                const div = document.createElement('div');
+                div.id = `queue-item-${i}`;
+                
+                // 再生中の曲はハイライトする
+                div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${
+                    isActive 
+                    ? 'bg-white/10 border-l-4 border-red-500' 
+                    : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'
+                }`;
+                
+                div.onclick = () => {
+                    playTrack(i);
+                    // 曲を選択した時にキュー画面を自動で閉じる
+                    toggleQueueView(false);
+                };
+                
+                div.innerHTML = `
+                    <div class="w-10 h-10 relative flex-shrink-0">
+                        <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover">
+                        ${isActive ? `
+                        <div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center">
+                            <i class="fas fa-volume-up text-white text-xs"></i>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
+                        <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            // 現在再生中の曲までスクロールさせる
+            if (currentIdx !== -1) {
+                setTimeout(() => {
+                    const activeItem = document.getElementById(`queue-item-${currentIdx}`);
+                    if (activeItem) {
+                        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100);
+            }
+        }
 
         function initLibrary() {
             const listContainer = document.getElementById('song-list');
@@ -530,7 +364,6 @@
                 const div = document.createElement('div');
                 div.id = `song-item-${i}`;
                 div.className = "flex items-center gap-3 py-3 px-2 rounded-xl border-b border-white/5 active:bg-white/5 cursor-pointer transition-colors";
-                // 曲を選択したら再生を開始し、プレーヤーを表示する
                 div.onclick = () => {
                     playTrack(i);
                     toggleFullPlayer(true);
@@ -548,13 +381,21 @@
 
         function playTrack(idx) {
             if (idx === currentIdx && !audio.paused) return;
-            if (currentIdx !== -1) document.getElementById(`song-item-${currentIdx}`)?.classList.remove('active-song-item');
+            
+            // 以前の曲のハイライトを削除
+            if (currentIdx !== -1) {
+                const prevSongItem = document.getElementById(`song-item-${currentIdx}`);
+                if (prevSongItem) prevSongItem.classList.remove('active-song-item');
+            }
 
             currentIdx = idx;
             const t = tracks[idx];
             audio.src = t.src;
             
-            document.getElementById(`song-item-${idx}`).classList.add('active-song-item');
+            // 新しい曲のハイライトを追加
+            const newSongItem = document.getElementById(`song-item-${idx}`);
+            if (newSongItem) newSongItem.classList.add('active-song-item');
+            
             document.getElementById('mini-title').innerText = t.title;
             document.getElementById('full-title').innerText = t.title;
             document.getElementById('mini-artist').innerText = t.artist;
@@ -567,6 +408,12 @@
             audio.play();
             updateMediaSession();
             updatePlayButtonIcons();
+
+            // キュー画面が開いている場合は再描画してハイライトを更新
+            const queueView = document.getElementById('queue-view');
+            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
+                renderQueueList();
+            }
         }
 
         // --- ループ機能 ---
@@ -726,12 +573,21 @@
                 });
                 navigator.mediaSession.setActionHandler('play', () => handlePlayPause());
                 navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
-                navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
-                navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
-            }
-        }
+        navigator.mediaSession.setActionHandler('nexttrack', () => handleNext());
+        navigator.mediaSession.setActionHandler('previoustrack', () => handlePrev());
+    }
+}
 
-        window.onload = initLibrary;
-    </script>
+// PWA: Service Worker の登録
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('Service Worker 登録成功:', reg.scope))
+            .catch(err => console.log('Service Worker 登録失敗:', err));
+    });
+}
+
+window.onload = initLibrary;
+</script>
 </body>
 </html>
