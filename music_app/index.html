@@ -7,7 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* CSS 構成 */
         body { 
             background: #000; 
             color: #fff; 
@@ -26,24 +25,27 @@
         .player-view { 
             transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1); 
         }
-        
-        .lyrics-view { 
-            display: none; 
-            overflow-y: auto; 
-            height: 100%; 
-            mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent); 
-        }
 
         /* シークバーのカスタマイズ */
+        .seek-container {
+            position: relative;
+            height: 24px;
+            display: flex;
+            align-items: center;
+        }
+
         input[type="range"] { 
             -webkit-appearance: none; 
-            appearance: none; /* 標準プロパティを追加 */
+            appearance: none; 
             background: transparent; 
+            width: 100%;
+            position: relative;
+            z-index: 10;
         }
         input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; }
         input[type="range"]::-webkit-slider-thumb { 
             -webkit-appearance: none; 
-            appearance: none; /* 標準プロパティを追加 */
+            appearance: none; 
             height: 14px; 
             width: 14px; 
             border-radius: 50%; 
@@ -52,15 +54,60 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        /* シークバー上のループ範囲ビジュアライザー */
+        #loop-visual-bar {
+            position: absolute;
+            height: 4px;
+            background: #ef4444;
+            border-radius: 2px;
+            z-index: 5;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
         .active-song-item {
             background: rgba(255, 255, 255, 0.1);
             border-left: 3px solid #ef4444;
+        }
+
+        /* Apple Musicスタイルのフッターアイコン */
+        .footer-icon-btn {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .footer-icon-btn:active {
+            transform: scale(0.9);
+            opacity: 0.6;
+        }
+
+        .control-btn {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 800;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .control-btn.active {
+            background: #fff;
+            color: #000;
+            border-color: #fff;
         }
     </style>
 </head>
 <body class="flex flex-col">
 
-    <!-- 背景ブラー -->
+    <!-- 背景のぼかし -->
     <div id="bg-blur" class="fixed inset-0 z-[-1] opacity-40 blur-[80px] scale-150 transition-all duration-1000"></div>
 
     <!-- ライブラリ画面 -->
@@ -80,7 +127,7 @@
 
         <h2 class="text-xl font-bold mb-4 text-white/60">すべての曲</h2>
         <div id="song-list" class="space-y-1">
-            <!-- JSで動的に生成 -->
+            <!-- 動的に生成されます -->
         </div>
     </main>
 
@@ -104,12 +151,9 @@
             <div class="w-10 h-1.5 bg-white/20 rounded-full"></div>
         </div>
 
-        <!-- アートワーク / 歌詞 -->
-        <div class="flex-1 flex items-center justify-center overflow-hidden relative">
+        <!-- アートワークエリア -->
+        <div class="flex-1 flex items-center justify-center overflow-hidden">
             <img id="full-img" src="" class="w-full max-w-[320px] aspect-square rounded-2xl shadow-2xl transition-all duration-500 scale-90">
-            <div id="lyrics-container" class="lyrics-view absolute inset-0 text-center flex flex-col items-center py-10">
-                <p id="lyrics-text" class="text-xl font-bold leading-relaxed whitespace-pre-wrap px-4 text-white/80"></p>
-            </div>
         </div>
 
         <!-- タイトルエリア -->
@@ -119,27 +163,30 @@
                     <h2 id="full-title" class="text-2xl font-bold truncate">曲名</h2>
                     <p id="full-artist" class="text-xl text-white/50 truncate">アーティスト</p>
                 </div>
-                <div class="flex flex-col items-end gap-2 ml-4">
-                    <button id="btn-loop" onclick="toggleLoopMode()" class="px-4 py-1 rounded-full border border-white/20 text-[10px] font-bold transition-all">
-                        LOOP MODE
-                    </button>
-                    <button id="btn-turn-end" onclick="triggerTurnEnd()" class="hidden px-4 py-2 bg-red-600 rounded-lg text-xs font-black shadow-lg animate-pulse">
-                        TURN END
-                    </button>
+                <!-- ループコントロールコンテナ -->
+                <div class="flex items-center gap-2 ml-4">
+                    <button id="btn-loop-toggle" onclick="toggleLoopMode()" class="control-btn">LOOP</button>
+                    <button id="btn-loop-start" onclick="setLoopStart()" class="control-btn">START</button>
+                    <button id="btn-loop-finish" onclick="setLoopFinish()" class="control-btn">FINISH</button>
                 </div>
             </div>
+            <!-- ループモードのステータスインジケーター -->
+            <div id="loop-indicator" class="text-[9px] text-red-500 font-bold mt-1 opacity-0 transition-opacity">LOOP ACTIVE</div>
         </div>
 
-        <!-- プログレスバー -->
+        <!-- 進捗バー（ループビジュアライザー付き） -->
         <div class="mb-8">
-            <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
+            <div class="seek-container">
+                <div id="loop-visual-bar"></div>
+                <input type="range" id="seek-bar" class="w-full" value="0" step="0.1" oninput="handleSeek(this.value)">
+            </div>
             <div class="flex justify-between text-[11px] font-bold text-white/30 mt-2">
                 <span id="time-curr">0:00</span>
                 <span id="time-total">0:00</span>
             </div>
         </div>
 
-        <!-- コントロール -->
+        <!-- メインコントロール -->
         <div class="flex justify-around items-center mb-10">
             <button onclick="handlePrev()" class="text-3xl active:scale-90 transition-transform"><i class="fas fa-backward"></i></button>
             <button onclick="handlePlayPause()" class="text-6xl w-24 active:scale-95 transition-transform"><i id="full-play-btn" class="fas fa-play"></i></button>
@@ -147,52 +194,47 @@
         </div>
 
         <!-- フッターアクション -->
-        <div class="flex justify-between items-center px-10 text-white/40 text-xl">
-            <button onclick="toggleLyrics()"><i id="lyric-icon" class="fas fa-quote-right"></i></button>
-            <button class="active:text-white"><i class="fas fa-list-ul"></i></button>
-            <button class="active:text-white"><i class="fas fa-share-alt"></i></button>
+        <div class="flex justify-around items-center px-4 text-white/40 text-xl mb-4">
+            <button id="btn-queue-toggle" onclick="onQueueButtonClick()" class="footer-icon-btn">
+                <i class="fas fa-list-ul"></i>
+            </button>
+            <button id="btn-lyrics-toggle" onclick="onLyricsButtonClick()" class="footer-icon-btn">
+                <i class="fas fa-quote-right"></i>
+            </button>
         </div>
     </div>
 
     <audio id="audio-element"></audio>
 
     <script>
-        /**
-         * 構成イメージ:
-         * songs/ 配下に音声ファイル
-         * img/ 配下に画像ファイル
-         */
         const tracks = [
             { 
                 id: 1, 
                 title: "ラピスラズリ", 
                 artist: "応援曲・廃盤", 
-                img: "img/iconcheer.png", // img/hissatsu.jpg
+                img: "img/iconcheer.png", 
                 color: "#4a1c1c",
-                src: "songs/ラピスラズリ.mp3", // songs/hissatsu.mp3
-                lyrics: "（前奏）\nチャチャチャーン！\nさあ、ここからループ！\n（ループ区間：サビ）\n打て打て！ホームラン！",
-                loopStart: 10, 
-                loopEnd: 30 
+                src: "songs/ラピスラズリ.mp3"
             },
             { 
                 id: 2, 
                 title: "エル・クンバンチェロ", 
                 artist: "高校野球・熱風", 
-                img: "img/iconcheer.png", // img/cumbanchero.jpg
+                img: "img/iconcheer.png", 
                 color: "#1c3a4a",
-                src: "songs/erukun.mp3", // songs/cumbanchero.mp3
-                lyrics: "ア！エ！イ！オ！ウ！\nクンバンチェロ！",
-                loopStart: 5, 
-                loopEnd: 25
+                src: "songs/erukun.mp3"
             }
         ];
 
         let currentIdx = -1;
         let isLooping = false; 
-        let turnEndFlag = false; 
+        let loopStartTime = null;
+        let loopFinishTime = null;
         const audio = document.getElementById('audio-element');
 
-        // 初期化：リスト表示
+        function onLyricsButtonClick() { console.log("Lyrics feature"); }
+        function onQueueButtonClick() { console.log("Queue feature"); }
+
         function initLibrary() {
             const listContainer = document.getElementById('song-list');
             listContainer.innerHTML = '';
@@ -200,7 +242,11 @@
                 const div = document.createElement('div');
                 div.id = `song-item-${i}`;
                 div.className = "flex items-center gap-3 py-3 px-2 rounded-xl border-b border-white/5 active:bg-white/5 cursor-pointer transition-colors";
-                div.onclick = () => playTrack(i);
+                // 曲を選択したら再生を開始し、プレーヤーを表示する
+                div.onclick = () => {
+                    playTrack(i);
+                    toggleFullPlayer(true);
+                };
                 div.innerHTML = `
                     <img src="${t.img}" class="w-10 h-10 rounded object-cover shadow-lg">
                     <div class="min-w-0">
@@ -214,17 +260,12 @@
 
         function playTrack(idx) {
             if (idx === currentIdx && !audio.paused) return;
-            
-            // 前のアイテムのスタイルをリセット
-            if (currentIdx !== -1) {
-                document.getElementById(`song-item-${currentIdx}`)?.classList.remove('active-song-item');
-            }
+            if (currentIdx !== -1) document.getElementById(`song-item-${currentIdx}`)?.classList.remove('active-song-item');
 
             currentIdx = idx;
             const t = tracks[idx];
             audio.src = t.src;
             
-            // UI更新
             document.getElementById(`song-item-${idx}`).classList.add('active-song-item');
             document.getElementById('mini-title').innerText = t.title;
             document.getElementById('full-title').innerText = t.title;
@@ -232,77 +273,130 @@
             document.getElementById('full-artist').innerText = t.artist;
             document.getElementById('mini-img').src = t.img;
             document.getElementById('full-img').src = t.img;
-            document.getElementById('lyrics-text').innerText = t.lyrics;
             document.getElementById('bg-blur').style.backgroundColor = t.color;
             
-            isLooping = false;
-            turnEndFlag = false;
-            updateLoopUI();
-
+            resetLoopState(); // 曲が変わったらループ解除
             audio.play();
             updateMediaSession();
             updatePlayButtonIcons();
         }
 
+        // --- ループ機能 ---
+        function setLoopStart() {
+            loopStartTime = audio.currentTime;
+            isLooping = true;
+            updateLoopUI();
+        }
+
+        function setLoopFinish() {
+            if (loopStartTime === null) loopStartTime = 0;
+            loopFinishTime = audio.currentTime;
+            isLooping = true;
+            // FinishがStartより前なら入れ替える
+            if (loopFinishTime < loopStartTime) {
+                [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime];
+            }
+            updateLoopUI();
+        }
+
+        function toggleLoopMode() {
+            if (isLooping) {
+                resetLoopState();
+            } else {
+                isLooping = true;
+            }
+            updateLoopUI();
+        }
+
+        function resetLoopState() {
+            isLooping = false;
+            loopStartTime = null;
+            loopFinishTime = null;
+            updateLoopUI();
+        }
+
+        function updateLoopUI() {
+            const btnToggle = document.getElementById('btn-loop-toggle');
+            const btnStart = document.getElementById('btn-loop-start');
+            const btnFinish = document.getElementById('btn-loop-finish');
+            const indicator = document.getElementById('loop-indicator');
+            const visualBar = document.getElementById('loop-visual-bar');
+
+            btnToggle.classList.toggle('active', isLooping);
+            btnStart.classList.toggle('active', loopStartTime !== null);
+            btnFinish.classList.toggle('active', loopFinishTime !== null);
+
+            if (isLooping) {
+                indicator.style.opacity = "1";
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    indicator.innerText = "A-B LOOP ACTIVE";
+                    updateLoopVisualBar();
+                    visualBar.style.opacity = "1";
+                } else {
+                    indicator.innerText = "SINGLE TRACK LOOP ACTIVE";
+                    visualBar.style.opacity = "0";
+                }
+            } else {
+                indicator.style.opacity = "0";
+                visualBar.style.opacity = "0";
+            }
+        }
+
+        function updateLoopVisualBar() {
+            const visualBar = document.getElementById('loop-visual-bar');
+            if (loopStartTime !== null && loopFinishTime !== null && audio.duration) {
+                const startPercent = (loopStartTime / audio.duration) * 100;
+                const endPercent = (loopFinishTime / audio.duration) * 100;
+                visualBar.style.left = startPercent + "%";
+                visualBar.style.width = (endPercent - startPercent) + "%";
+            }
+        }
+
         audio.ontimeupdate = () => {
             if (currentIdx === -1) return;
-            const t = tracks[currentIdx];
             
-            // 野球応援ループ処理
-            if (isLooping && !turnEndFlag) {
-                if (audio.currentTime >= t.loopEnd) {
-                    audio.currentTime = t.loopStart;
+            // ループ制御ロジック
+            if (isLooping) {
+                if (loopStartTime !== null && loopFinishTime !== null) {
+                    // A-Bループ
+                    if (audio.currentTime >= loopFinishTime) {
+                        audio.currentTime = loopStartTime;
+                    }
+                } else {
+                    // 1曲ループ（START/FINISHが両方設定されていない場合）
+                    if (audio.currentTime >= audio.duration - 0.2) {
+                        audio.currentTime = 0;
+                        audio.play();
+                    }
                 }
             }
 
-            // シークバー更新
             if (!isNaN(audio.duration)) {
                 const bar = document.getElementById('seek-bar');
                 bar.max = audio.duration;
                 bar.value = audio.currentTime;
                 document.getElementById('time-curr').innerText = formatTime(audio.currentTime);
                 document.getElementById('time-total').innerText = formatTime(audio.duration);
+                
+                if (isLooping && loopStartTime !== null && loopFinishTime !== null) {
+                    updateLoopVisualBar();
+                }
             }
         };
 
         audio.onplay = () => updatePlayButtonIcons();
         audio.onpause = () => updatePlayButtonIcons();
         audio.onended = () => {
-            if (!isLooping) handleNext();
+            if (!isLooping) {
+                handleNext();
+            } else if (loopStartTime === null || loopFinishTime === null) {
+                audio.currentTime = 0;
+                audio.play();
+            }
         };
 
-        function toggleLoopMode() {
-            isLooping = !isLooping;
-            turnEndFlag = false;
-            updateLoopUI();
-        }
-
-        function triggerTurnEnd() {
-            turnEndFlag = true;
-            document.getElementById('btn-turn-end').innerText = "ENDING...";
-        }
-
-        function updateLoopUI() {
-            const btn = document.getElementById('btn-loop');
-            const turnBtn = document.getElementById('btn-turn-end');
-            
-            if (isLooping) {
-                btn.classList.add('bg-red-500', 'border-transparent');
-                btn.classList.remove('border-white/20');
-                turnBtn.classList.remove('hidden');
-            } else {
-                btn.classList.remove('bg-red-500', 'border-transparent');
-                btn.classList.add('border-white/20');
-                turnBtn.classList.add('hidden');
-            }
-            turnBtn.innerText = "TURN END";
-        }
-
         function handlePlayPause() {
-            if (currentIdx === -1) {
-                playTrack(0);
-                return;
-            }
+            if (currentIdx === -1) { playTrack(0); return; }
             if (audio.paused) audio.play(); else audio.pause();
         }
 
@@ -310,26 +404,14 @@
             const miniIcon = document.getElementById('mini-play-btn');
             const fullIcon = document.getElementById('full-play-btn');
             const isPaused = audio.paused;
-            
             miniIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
             fullIcon.className = isPaused ? "fas fa-play" : "fas fa-pause";
-            
             document.getElementById('full-img').style.transform = isPaused ? "scale(0.85)" : "scale(1.0)";
         }
 
-        function handleNext() {
-            let next = (currentIdx + 1) % tracks.length;
-            playTrack(next);
-        }
-
-        function handlePrev() {
-            let prev = (currentIdx - 1 + tracks.length) % tracks.length;
-            playTrack(prev);
-        }
-
-        function handleSeek(v) {
-            audio.currentTime = v;
-        }
+        function handleNext() { playTrack((currentIdx + 1) % tracks.length); }
+        function handlePrev() { playTrack((currentIdx - 1 + tracks.length) % tracks.length); }
+        function handleSeek(v) { audio.currentTime = v; }
 
         function toggleFullPlayer(show) {
             const player = document.getElementById('full-player');
@@ -337,17 +419,6 @@
             player.style.transform = show ? "translateY(0)" : "translateY(100%)";
             mini.style.opacity = show ? "0" : "1";
             mini.style.pointerEvents = show ? "none" : "auto";
-        }
-
-        function toggleLyrics() {
-            const container = document.getElementById('lyrics-container');
-            const img = document.getElementById('full-img');
-            const icon = document.getElementById('lyric-icon');
-            const isVisible = container.style.display === 'flex';
-            
-            container.style.display = isVisible ? 'none' : 'flex';
-            img.style.opacity = isVisible ? '1' : '0.15';
-            icon.classList.toggle('text-red-500', !isVisible);
         }
 
         function formatTime(s) {
@@ -372,7 +443,6 @@
             }
         }
 
-        // 初期化
         window.onload = initLibrary;
     </script>
 </body>
