@@ -240,7 +240,7 @@
     </div>
 
     <!-- ミニプレイヤー -->
-    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-40 shadow-2xl transition-opacity duration-300" onclick="handleMiniPlayerClick()">
+    <div id="mini-player" class="fixed bottom-6 left-4 right-4 h-16 glass rounded-2xl flex items-center px-3 z-[48] shadow-2xl transition-opacity duration-300" onclick="handleMiniPlayerClick()">
         <div id="mini-swipe-area" class="flex-1 h-full flex items-center overflow-hidden mr-2 relative cursor-pointer">
             <div id="mini-content-wrapper" class="flex items-center w-full">
                 <img id="mini-img" src="img/iconcheer.png" class="w-11 h-11 rounded-lg object-cover bg-white/10 shrink-0" alt="cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
@@ -321,7 +321,6 @@
 
     <!-- === Apple Music風 歌詞画面 === -->
     <div id="lyrics-view" class="fixed inset-0 z-[55] player-view translate-y-full flex flex-col overflow-hidden">
-        <!-- フルプレイヤーの背景を透かせるため、半透明のオーバーレイのみ -->
         <div class="absolute inset-0 bg-black/40 backdrop-blur-2xl z-[-1]"></div>
         
         <div class="flex justify-between items-center h-20 px-6 shrink-0 relative z-10 bg-gradient-to-b from-black/60 to-transparent pt-4">
@@ -329,7 +328,7 @@
                 <i class="fas fa-chevron-down"></i>
             </button>
             <div class="font-bold text-sm tracking-widest text-white/80">LYRICS</div>
-            <div class="w-10"></div> <!-- レイアウト調整用 -->
+            <div class="w-10"></div>
         </div>
         
         <!-- 歌詞表示領域 -->
@@ -357,7 +356,6 @@
     <audio id="audio-element"></audio>
 
     <script>
-        // tracks配列に lrc パスを追加 (ファイル名はIDと同じ番号を想定)
         const tracks = [
             { id: 1, title: "校歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/1.mp3", lrc: "lyrics/1.lrc" },
             { id: 2, title: "応援歌", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/2.mp3", lrc: "lyrics/2.lrc" },
@@ -399,7 +397,13 @@
             { id: 38, title: "春風", artist: "常総学院高等学校応援団", img: "img/iconcheer.png", color: "#4a1c1c", src: "songs/38.mp3", lrc: "lyrics/38.lrc" }
         ];
 
-        let currentIdx = -1;
+        // 再生キューの状態管理
+        let playQueue = [];
+        let currentQueueIdx = -1;
+        
+        let currentIdx = -1; // 既存のUI更新用（トラック自体の絶対インデックス）
+        let currentTrack = null;
+
         let isLooping = false; 
         let loopStartTime = null;
         let loopFinishTime = null;
@@ -413,12 +417,16 @@
         let currentEditingPlaylistId = null;
         let isPlaylistEditing = false;
         let playlistSortable = null;
+        let queueSortable = null;
         let pendingPlaylistTrackId = null;
         let tempNewPlaylistCover = null;
 
         // 歌詞管理用変数
         let currentLyrics = [];
         let currentLyricIndex = -1;
+
+        // --- 初期設定 ---
+        playQueue = tracks.map(t => t.id); // 初期起動時はすべての曲をキューにセット
 
         function saveData() {
             try {
@@ -497,7 +505,7 @@
                 div.className = "flex items-center gap-3 py-2 px-2 rounded-xl border-b border-white/5 active:bg-white/5 transition-colors";
                 div.innerHTML = `
                     <img src="${t.img}" class="w-12 h-12 rounded object-cover shadow-md" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
-                    <div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playTrackAndShowPlayer(${t.id})">
+                    <div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playContextTrack(${t.id}, tracks.map(tr=>tr.id))">
                         <div class="text-sm font-semibold truncate">${t.title}</div>
                         <div class="text-[10px] text-white/40">${t.artist}</div>
                     </div>
@@ -509,8 +517,7 @@
             });
         }
 
-        // お気に入り・プレイリスト関連の関数 (省略せず維持)
-        function toggleFavoriteCurrent() { if (currentIdx !== -1) toggleFavorite(tracks[currentIdx].id); }
+        function toggleFavoriteCurrent() { if (currentTrack) toggleFavorite(currentTrack.id); }
         function toggleFavorite(trackId) {
             const idx = favorites.indexOf(trackId);
             if (idx > -1) favorites.splice(idx, 1); else favorites.push(trackId);
@@ -519,7 +526,7 @@
             if (favView.style.transform === 'translateX(0px)' || favView.style.transform === 'translateX(0%)') renderFavorites();
         }
         function updateFavoriteUI(trackId) {
-            if (currentIdx !== -1 && tracks[currentIdx].id === trackId) {
+            if (currentTrack && currentTrack.id === trackId) {
                 document.getElementById('btn-favorite').innerHTML = favorites.includes(trackId) ? '<i class="fas fa-heart text-pink-500"></i>' : '<i class="far fa-heart"></i>';
             }
         }
@@ -529,7 +536,7 @@
             favorites.forEach(trackId => {
                 const t = tracks.find(x => x.id === trackId); if(!t) return;
                 const div = document.createElement('div'); div.className = "flex items-center gap-3 py-2 border-b border-white/5";
-                div.innerHTML = `<img src="${t.img}" class="w-12 h-12 rounded object-cover shadow-md" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';"><div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playTrackAndShowPlayer(${t.id})"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div><button onclick="openTrackOptions(${t.id})" class="w-10 h-10 flex items-center justify-center text-white/50 active:bg-white/10 rounded-full transition-colors shrink-0"><i class="fas fa-ellipsis-h"></i></button>`;
+                div.innerHTML = `<img src="${t.img}" class="w-12 h-12 rounded object-cover shadow-md" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';"><div class="flex-1 min-w-0 cursor-pointer py-2" onclick="playContextTrack(${t.id}, favorites)"><div class="text-sm font-semibold truncate">${t.title}</div><div class="text-[10px] text-white/40">${t.artist}</div></div><button onclick="openTrackOptions(${t.id})" class="w-10 h-10 flex items-center justify-center text-white/50 active:bg-white/10 rounded-full transition-colors shrink-0"><i class="fas fa-ellipsis-h"></i></button>`;
                 container.appendChild(div);
             });
         }
@@ -611,8 +618,8 @@
         }
         function removeTrackFromPlaylist(plId, index) { const p = playlists.find(x => x.id === plId); if(p) { p.tracks.splice(index, 1); saveData(); renderPlaylistDetailList(p); renderPlaylists(); } }
         function confirmDeletePlaylist() { if(!currentEditingPlaylistId) return; playlists = playlists.filter(x => x.id !== currentEditingPlaylistId); saveData(); closeModal('modal-delete-playlist'); closeView('view-playlist-detail'); renderPlaylists(); }
-        function playPlaylist() { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks.length > 0) { const gIdx = tracks.findIndex(t => t.id === p.tracks[0]); if(gIdx !== -1) playTrackAndShowPlayer(tracks[gIdx].id); } }
-        function playPlaylistTrack(idxInPl) { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks[idxInPl]) { const gIdx = tracks.findIndex(t => t.id === p.tracks[idxInPl]); if(gIdx !== -1) playTrackAndShowPlayer(tracks[gIdx].id); } }
+        function playPlaylist() { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks.length > 0) { playContextTrack(p.tracks[0], p.tracks); } }
+        function playPlaylistTrack(idxInPl) { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks[idxInPl]) { playContextTrack(p.tracks[idxInPl], p.tracks); } }
         function openTrackSelector() { renderTrackSelector(); openModal('modal-track-selector'); }
         function renderTrackSelector() {
             const p = playlists.find(x => x.id === currentEditingPlaylistId); if(!p) return;
@@ -651,33 +658,70 @@
         }
 
         // ====== プレイヤーコア ======
-        function playTrackAndShowPlayer(trackId) {
-            const idx = tracks.findIndex(t => t.id === trackId);
-            if(idx !== -1) { playTrack(idx); toggleFullPlayer(true); }
+
+        // 再生コンテキスト（リスト）に基づくキューの更新と再生
+        function playContextTrack(trackId, contextIds) {
+            if (!contextIds || contextIds.length === 0) return;
+            playQueue = [...contextIds];
+            const qIdx = playQueue.indexOf(trackId);
+            playTrackFromQueue(qIdx !== -1 ? qIdx : 0);
+            toggleFullPlayer(true);
         }
 
-        function playTrack(idx) {
-            if (idx === currentIdx && !audio.paused) return;
-            if (currentIdx !== -1) { const prevSongItem = document.getElementById(`song-item-${currentIdx}`); if (prevSongItem) prevSongItem.classList.remove('active-song-item'); }
-
-            currentIdx = idx; const t = tracks[idx]; audio.src = t.src;
+        function playTrackFromQueue(queueIdx) {
+            if (queueIdx < 0 || queueIdx >= playQueue.length) return;
             
-            const newSongItem = document.getElementById(`song-item-${idx}`); if (newSongItem) newSongItem.classList.add('active-song-item');
-            document.getElementById('mini-title').innerText = t.title; document.getElementById('full-title').innerText = t.title;
-            document.getElementById('mini-artist').innerText = t.artist; document.getElementById('full-artist').innerText = t.artist;
-            document.getElementById('mini-img').src = t.img; document.getElementById('full-img').src = t.img;
-            document.getElementById('full-player-bg-img').src = t.img; document.getElementById('bg-blur').style.backgroundColor = t.color;
-            document.getElementById('queue-mini-title').innerText = t.title; document.getElementById('queue-mini-artist').innerText = t.artist; document.getElementById('queue-mini-img').src = t.img;
+            const trackId = playQueue[queueIdx];
+            const track = tracks.find(t => t.id === trackId);
+            if (!track) return;
             
-            document.getElementById('seek-progress').style.width = '0%'; document.getElementById('seek-bar').value = 0;
+            if (currentQueueIdx === queueIdx && !audio.paused) return;
+            
+            // 既存の全体リストのUI選択状態をリセット
+            if (currentIdx !== -1) { 
+                const prevSongItem = document.getElementById(`song-item-${currentIdx}`); 
+                if (prevSongItem) prevSongItem.classList.remove('active-song-item'); 
+            }
 
-            updateFavoriteUI(t.id); resetLoopState(); audio.play(); updateMediaSession(); updatePlayButtonIcons();
+            currentQueueIdx = queueIdx;
+            currentTrack = track;
+            currentIdx = tracks.findIndex(t => t.id === track.id); // 全体リスト用インデックス
 
+            audio.src = track.src;
+            
+            // 全体リストのUI選択状態を更新
+            const newSongItem = document.getElementById(`song-item-${currentIdx}`); 
+            if (newSongItem) newSongItem.classList.add('active-song-item');
+
+            document.getElementById('mini-title').innerText = track.title; 
+            document.getElementById('full-title').innerText = track.title;
+            document.getElementById('mini-artist').innerText = track.artist; 
+            document.getElementById('full-artist').innerText = track.artist;
+            document.getElementById('mini-img').src = track.img; 
+            document.getElementById('full-img').src = track.img;
+            document.getElementById('full-player-bg-img').src = track.img; 
+            document.getElementById('bg-blur').style.backgroundColor = track.color;
+            
+            document.getElementById('queue-mini-title').innerText = track.title; 
+            document.getElementById('queue-mini-artist').innerText = track.artist; 
+            document.getElementById('queue-mini-img').src = track.img;
+            
+            document.getElementById('seek-progress').style.width = '0%'; 
+            document.getElementById('seek-bar').value = 0;
+
+            updateFavoriteUI(track.id); 
+            resetLoopState(); 
+            audio.play().catch(e => console.warn(e)); 
+            updatePlayButtonIcons();
+
+            // キュー画面が開いている場合は更新
             const queueView = document.getElementById('queue-view');
-            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") renderQueueList();
+            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
+                renderQueueList();
+            }
             
-            // 曲が変わったら歌詞データを読み込む
-            loadLyrics(t.id, t.lrc);
+            // 歌詞データを読み込む
+            loadLyrics(track.id, track.lrc);
         }
 
         // ====== 歌詞（LRC）パーサーと同期ロジック ======
@@ -693,7 +737,6 @@
             }
 
             try {
-                // Fetch APIを使ってローカルまたはサーバー上のLRCファイルを取得
                 const response = await fetch(lrcPath);
                 if (!response.ok) throw new Error('File not found or CORS error');
                 const text = await response.text();
@@ -706,8 +749,7 @@
                         <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
                         <div class="font-bold text-xl mb-2">現在歌詞はご覧になれません</div>
                         <div class="text-xs text-center px-4 leading-relaxed max-w-sm">
-                            <code class="bg-white/10 px-1 rounded">${lrcPath}</code> が見つからないか、ブラウザのセキュリティ制限(CORS)によりブロックされました。<br>
-                            ※ローカルファイルを直接開いている場合は、VSCodeのLive Server等をご利用ください。
+                            <code class="bg-white/10 px-1 rounded">${lrcPath}</code> が見つからないか、ブラウザのセキュリティ制限(CORS)によりブロックされました。
                         </div>
                     </div>
                 `;
@@ -717,7 +759,6 @@
         function parseLRC(lrcText) {
             const lines = lrcText.split('\n');
             const lyrics = [];
-            // [mm:ss.xx] または [mm:ss.xxx] の形式に対応する正規表現
             const timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
             
             for (let line of lines) {
@@ -726,12 +767,9 @@
                     const min = parseInt(match[1], 10);
                     const sec = parseInt(match[2], 10);
                     const ms = parseInt(match[3], 10);
-                    // ミリ秒の桁数が2桁か3桁かで計算を変える
                     const time = min * 60 + sec + (ms / (match[3].length === 3 ? 1000 : 100));
                     const text = line.replace(timeReg, '').trim();
-                    if (text) {
-                        lyrics.push({ time, text });
-                    }
+                    if (text) { lyrics.push({ time, text }); }
                 }
             }
             return lyrics;
@@ -751,7 +789,6 @@
                 p.id = `lyric-${index}`;
                 p.className = 'lyric-line';
                 p.innerText = lyric.text;
-                // タップでその歌詞の時間にシークする
                 p.onclick = () => {
                     audio.currentTime = lyric.time;
                     if (audio.paused) audio.play();
@@ -759,7 +796,6 @@
                 container.appendChild(p);
             });
             
-            // スクロールのための余白
             const spacer = document.createElement('div');
             spacer.className = "h-40";
             container.appendChild(spacer);
@@ -770,7 +806,6 @@
             
             let newIndex = -1;
             for (let i = 0; i < currentLyrics.length; i++) {
-                // 0.3秒ほど早めにハイライトさせる（歌い出しのタイミングを合わせるため）
                 if (currentTime + 0.3 >= currentLyrics[i].time) {
                     newIndex = i;
                 } else {
@@ -789,7 +824,6 @@
                 
                 if (activeEl) {
                     activeEl.classList.add('lyric-active');
-                    // 歌詞画面が開いている時だけ自動スクロール
                     const lyricsView = document.getElementById('lyrics-view');
                     if (lyricsView.style.transform === "translateY(0px)" || lyricsView.style.transform === "translateY(0)") {
                         activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -805,7 +839,6 @@
             if (show) {
                 lyricsView.style.transform = "translateY(0)";
                 if(lyricsBtn) { lyricsBtn.classList.add('text-white'); lyricsBtn.classList.remove('text-white/40'); }
-                // 開いた瞬間に現在行へスクロール
                 if (currentLyricIndex !== -1) {
                     setTimeout(() => {
                         const activeEl = document.getElementById(`lyric-${currentLyricIndex}`);
@@ -818,7 +851,7 @@
             }
         }
 
-        // --- 以下既存のプレイヤー制御・ループ・スワイプ処理 ---
+        // --- プレイヤー制御・ループ・スワイプ処理 ---
         function setLoopStart() { loopStartTime = audio.currentTime; isLooping = true; updateLoopUI(); }
         function setLoopFinish() { if (loopStartTime === null) loopStartTime = 0; loopFinishTime = audio.currentTime; isLooping = true; if (loopFinishTime < loopStartTime) [loopStartTime, loopFinishTime] = [loopFinishTime, loopStartTime]; updateLoopUI(); }
         function toggleLoopMode() { if (isLooping) resetLoopState(); else isLooping = true; updateLoopUI(); }
@@ -839,7 +872,7 @@
         }
 
         audio.ontimeupdate = () => {
-            if (currentIdx === -1) return;
+            if (currentQueueIdx === -1) return;
             if (isLooping) { if (loopStartTime !== null && loopFinishTime !== null) { if (audio.currentTime >= loopFinishTime) audio.currentTime = loopStartTime; } else { if (audio.currentTime >= audio.duration - 0.2) { audio.currentTime = 0; audio.play(); } } }
             if (!isNaN(audio.duration)) {
                 const bar = document.getElementById('seek-bar'); bar.max = audio.duration; bar.value = audio.currentTime;
@@ -848,15 +881,20 @@
                 document.getElementById('time-total').innerText = formatTime(audio.duration);
                 if (isLooping) updateLoopVisualBar();
             }
-            // 歌詞の同期更新を呼び出し
             updateLyricsUI(audio.currentTime);
         };
 
         audio.onplay = () => updatePlayButtonIcons();
         audio.onpause = () => updatePlayButtonIcons();
-        audio.onended = () => { if (!isLooping) handleNext(); else if (loopStartTime === null || loopFinishTime === null) { audio.currentTime = 0; audio.play(); } };
+        audio.onended = () => { if (!isLooping) forceNextTrack(); else if (loopStartTime === null || loopFinishTime === null) { audio.currentTime = 0; audio.play(); } };
 
-        function handlePlayPause() { if (currentIdx === -1) { playTrack(0); return; } if (audio.paused) audio.play(); else audio.pause(); }
+        function handlePlayPause() { 
+            if (currentQueueIdx === -1) { 
+                playTrackFromQueue(0); 
+                return; 
+            } 
+            if (audio.paused) audio.play(); else audio.pause(); 
+        }
         function updatePlayButtonIcons() {
             const isPaused = audio.paused;
             document.getElementById('mini-play-btn').className = isPaused ? "fas fa-play text-xl" : "fas fa-pause text-xl";
@@ -865,9 +903,15 @@
         }
 
         function handleNext() { forceNextTrack(); }
-        function handlePrev() { if (currentIdx === -1) return; if (audio.currentTime >= 5.0) audio.currentTime = 0; else forcePrevTrack(); }
-        function forcePrevTrack() { if (currentIdx === -1) return; playTrack((currentIdx - 1 + tracks.length) % tracks.length); }
-        function forceNextTrack() { if (currentIdx === -1) return; playTrack((currentIdx + 1) % tracks.length); }
+        function handlePrev() { if (currentQueueIdx === -1) return; if (audio.currentTime >= 5.0) audio.currentTime = 0; else forcePrevTrack(); }
+        function forcePrevTrack() { 
+            if (currentQueueIdx === -1) return; 
+            playTrackFromQueue((currentQueueIdx - 1 + playQueue.length) % playQueue.length); 
+        }
+        function forceNextTrack() { 
+            if (currentQueueIdx === -1) return; 
+            playTrackFromQueue((currentQueueIdx + 1) % playQueue.length); 
+        }
         function handleSeek(v) { audio.currentTime = v; if (!isNaN(audio.duration)) document.getElementById('seek-progress').style.width = (v / audio.duration) * 100 + '%'; }
 
         function handleMiniPlayerClick() { if (!isMiniPlayerSwiping) toggleFullPlayer(true); }
@@ -882,16 +926,72 @@
             if (show) { renderQueueList(); queueView.style.transform = "translateY(0)"; if(queueBtn) { queueBtn.classList.add('text-white'); queueBtn.classList.remove('text-white/40'); } } 
             else { queueView.style.transform = "translateY(100%)"; if(queueBtn) { queueBtn.classList.remove('text-white'); queueBtn.classList.add('text-white/40'); } }
         }
+
+        // キューリストの描画とドラッグ＆ドロップ（Sortable.js）の設定
         function renderQueueList() {
-            const container = document.getElementById('queue-list'); container.innerHTML = '';
-            tracks.forEach((t, i) => {
-                const isActive = (i === currentIdx); const div = document.createElement('div'); div.id = `queue-item-${i}`;
+            const container = document.getElementById('queue-list'); 
+            container.innerHTML = '';
+            
+            playQueue.forEach((trackId, i) => {
+                const t = tracks.find(tr => tr.id === trackId);
+                if(!t) return;
+
+                const isActive = (i === currentQueueIdx); 
+                const div = document.createElement('div'); 
+                div.id = `queue-item-${i}`;
                 div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10 border-l-4 border-red-500' : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'}`;
-                div.onclick = () => playTrack(i);
-                div.innerHTML = `<div class="w-10 h-10 relative flex-shrink-0"><img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">${isActive ? `<div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center"><i class="fas fa-volume-up text-white text-xs"></i></div>` : ''}</div><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div><div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div></div>`;
+                
+                div.innerHTML = `
+                    <div class="w-10 h-10 relative flex-shrink-0" onclick="playTrackFromQueue(${i})">
+                        <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
+                        ${isActive ? `<div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center"><i class="fas fa-volume-up text-white text-xs"></i></div>` : ''}
+                    </div>
+                    <div class="flex-1 min-w-0" onclick="playTrackFromQueue(${i})">
+                        <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
+                        <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
+                    </div>
+                    <div class="w-10 h-10 flex items-center justify-center text-white/40 cursor-grab queue-drag-handle shrink-0 hover:text-white transition-colors">
+                        <i class="fas fa-bars"></i>
+                    </div>
+                `;
                 container.appendChild(div);
             });
-            if (currentIdx !== -1) { setTimeout(() => { const activeItem = document.getElementById(`queue-item-${currentIdx}`); if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 100); }
+
+            if (currentQueueIdx !== -1) { 
+                setTimeout(() => { 
+                    const activeItem = document.getElementById(`queue-item-${currentQueueIdx}`); 
+                    if (activeItem) activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' }); 
+                }, 100); 
+            }
+
+            if(queueSortable) {
+                queueSortable.destroy();
+            }
+            queueSortable = new Sortable(container, { 
+                handle: '.queue-drag-handle', 
+                animation: 200, 
+                ghostClass: 'sortable-ghost', 
+                dragClass: 'sortable-drag', 
+                onEnd: function (evt) { 
+                    const ni = evt.newIndex; 
+                    const oi = evt.oldIndex; 
+                    if(oi === ni) return; 
+                    
+                    const movedItem = playQueue.splice(oi, 1)[0]; 
+                    playQueue.splice(ni, 0, movedItem); 
+                    
+                    // currentQueueIdx の追従
+                    if (currentQueueIdx === oi) {
+                        currentQueueIdx = ni;
+                    } else if (oi < currentQueueIdx && ni >= currentQueueIdx) {
+                        currentQueueIdx--;
+                    } else if (oi > currentQueueIdx && ni <= currentQueueIdx) {
+                        currentQueueIdx++;
+                    }
+                    
+                    renderQueueList(); 
+                } 
+            });
         }
 
         function formatTime(s) { if (isNaN(s)) return "0:00"; const m = Math.floor(s / 60); const sec = Math.floor(s % 60); return `${m}:${sec < 10 ? '0' + sec : sec}`; }
@@ -955,8 +1055,8 @@
         }
 
         function updateMediaSession() {
-            if ('mediaSession' in navigator && currentIdx !== -1) {
-                const t = tracks[currentIdx];
+            if ('mediaSession' in navigator && currentTrack) {
+                const t = currentTrack;
                 navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, artwork: [ { src: t.img, sizes: '96x96', type: 'image/png' }, { src: t.img, sizes: '512x512', type: 'image/png' }, ] });
                 navigator.mediaSession.setActionHandler('play', () => audio.play()); navigator.mediaSession.setActionHandler('pause', () => audio.pause());
                 navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
