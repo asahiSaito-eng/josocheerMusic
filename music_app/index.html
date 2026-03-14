@@ -1080,11 +1080,29 @@
                 });
                 
                 // 直接audioオブジェクトを操作して、スリープ復帰時の無音バグを防ぐ
-                navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(e => console.warn(e)); }); 
-                navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); });
-                navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); 
-                navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
+                navigator.mediaSession.setActionHandler('play', async () => { 
+                    const pos = audio.currentTime;
+                    try {
+                        await audio.play();
+                        // ★無音バグ対策: 再生直後に時間を0.001秒だけ動かすことで、スリープしていたOSのオーディオ回路を強制的に再接続する
+                        if (pos > 0) {
+                            audio.currentTime = pos + 0.001;
+                        }
+                        updatePositionState();
+                    } catch (e) {
+                        console.warn("再生ブロック:", e);
+                        // 強制的にオーディオを再読み込みして復帰させる最終手段
+                        audio.load();
+                        audio.currentTime = pos;
+                        audio.play();
+                    }
+                }); 
 
+                navigator.mediaSession.setActionHandler('pause', () => { 
+                    audio.pause(); 
+                    updatePositionState(); // 停止時も状態を確実に同期
+                });
+                
                 // ★ 追加：ロック画面のシークバーを動かした時の処理
                 navigator.mediaSession.setActionHandler('seekto', (details) => {
                     if (details.fastSeek && 'fastSeek' in audio) {
