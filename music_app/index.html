@@ -284,9 +284,9 @@
                     <button id="btn-loop-start" onclick="setLoopStart()" class="control-btn">START</button>
                     <button id="btn-loop-finish" onclick="setLoopFinish()" class="control-btn">FINISH</button>
                 </div>
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 shrink-0">
                     <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right leading-tight max-w-[60px]">LOOP<br>ACTIVE</div>
-                    <button id="btn-favorite" onclick="toggleFavoriteCurrent()" class="text-2xl text-white/70 transition-all active:scale-75 w-10 h-10 flex items-center justify-center">
+                    <button id="btn-favorite" onclick="toggleFavoriteCurrent()" class="text-2xl text-white/70 transition-all active:scale-75 w-12 h-12 flex items-center justify-center shrink-0">
                         <i class="far fa-heart"></i>
                     </button>
                 </div>
@@ -1079,38 +1079,32 @@
                     ] 
                 });
                 
-                // 直接audioオブジェクトを操作して、スリープ復帰時の無音バグを防ぐ
-                navigator.mediaSession.setActionHandler('play', async () => { 
-                    const pos = audio.currentTime;
-                    try {
-                        await audio.play();
-                        // ★無音バグ対策: 再生直後に時間を0.001秒だけ動かすことで、スリープしていたOSのオーディオ回路を強制的に再接続する
-                        if (pos > 0) {
-                            audio.currentTime = pos + 0.001;
-                        }
-                        updatePositionState();
-                    } catch (e) {
-                        console.warn("再生ブロック:", e);
-                        // 強制的にオーディオを再読み込みして復帰させる最終手段
-                        audio.load();
-                        audio.currentTime = pos;
-                        audio.play();
-                    }
+                // 再生・停止（余計な再読み込み処理を削除し、純粋にplay/pauseを実行）
+                navigator.mediaSession.setActionHandler('play', () => { 
+                    audio.play().catch(e => console.warn("Play error:", e)); 
+                    updatePositionState();
                 }); 
-
                 navigator.mediaSession.setActionHandler('pause', () => { 
                     audio.pause(); 
-                    updatePositionState(); // 停止時も状態を確実に同期
+                    updatePositionState();
                 });
-                
-                // ★ 追加：ロック画面のシークバーを動かした時の処理
+
+                // スキップ・巻き戻し（確実に前の曲・次の曲へ飛ぶように再設定）
+                navigator.mediaSession.setActionHandler('previoustrack', () => {
+                    forcePrevTrack();
+                }); 
+                navigator.mediaSession.setActionHandler('nexttrack', () => {
+                    forceNextTrack();
+                });
+
+                // 再生バーのシーク（変更なし）
                 navigator.mediaSession.setActionHandler('seekto', (details) => {
                     if (details.fastSeek && 'fastSeek' in audio) {
                         audio.fastSeek(details.seekTime);
                     } else {
                         audio.currentTime = details.seekTime;
                     }
-                    updatePositionState(); // 動かした後の位置を再同期
+                    updatePositionState();
                 });
             }
         }
