@@ -353,7 +353,7 @@
         <div id="queue-list" class="flex-1 overflow-y-auto hide-scrollbar space-y-1 px-4 pb-10"></div>
     </div>
 
-    <audio id="audio-element"></audio>
+    <audio id="audio-element" playsinline preload="auto"></audio>
 
     <script>
         const tracks = [
@@ -714,6 +714,8 @@
             audio.play().catch(e => console.warn(e)); 
             updatePlayButtonIcons();
 
+            updateMediaSession();
+
             // キュー画面が開いている場合は更新
             const queueView = document.getElementById('queue-view');
             if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
@@ -1058,8 +1060,10 @@
             if ('mediaSession' in navigator && currentTrack) {
                 const t = currentTrack;
                 navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, artwork: [ { src: t.img, sizes: '96x96', type: 'image/png' }, { src: t.img, sizes: '512x512', type: 'image/png' }, ] });
-                navigator.mediaSession.setActionHandler('play', () => audio.play()); navigator.mediaSession.setActionHandler('pause', () => audio.pause());
-                navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
+                navigator.mediaSession.setActionHandler('play', () => handlePlayPause()); 
+                navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
+                navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); 
+                navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
             }
         }
 
