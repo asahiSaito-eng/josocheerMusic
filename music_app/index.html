@@ -886,8 +886,9 @@
             updateLyricsUI(audio.currentTime);
         };
 
-        audio.onplay = () => updatePlayButtonIcons();
-        audio.onpause = () => updatePlayButtonIcons();
+        audio.onloadedmetadata = () => { updatePositionState(); };
+        audio.onplay = () => { updatePlayButtonIcons(); updatePositionState(); };
+        audio.onpause = () => { updatePlayButtonIcons(); updatePositionState(); };
         audio.onended = () => { if (!isLooping) forceNextTrack(); else if (loopStartTime === null || loopFinishTime === null) { audio.currentTime = 0; audio.play(); } };
 
         function handlePlayPause() { 
@@ -1056,14 +1057,43 @@
             addVerticalSwipeListener(document.getElementById('lyrics-view'), () => toggleLyricsView(false));
         }
 
+        function updatePositionState() {
+            if ('mediaSession' in navigator && !isNaN(audio.duration) && audio.duration > 0) {
+                navigator.mediaSession.setPositionState({
+                    duration: audio.duration,
+                    playbackRate: audio.playbackRate || 1,
+                    position: audio.currentTime
+                });
+            }
+        }
+
         function updateMediaSession() {
             if ('mediaSession' in navigator && currentTrack) {
                 const t = currentTrack;
-                navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.artist, artwork: [ { src: t.img, sizes: '96x96', type: 'image/png' }, { src: t.img, sizes: '512x512', type: 'image/png' }, ] });
-                navigator.mediaSession.setActionHandler('play', () => handlePlayPause()); 
-                navigator.mediaSession.setActionHandler('pause', () => handlePlayPause());
+                navigator.mediaSession.metadata = new MediaMetadata({ 
+                    title: t.title, 
+                    artist: t.artist, 
+                    artwork: [ 
+                        { src: t.img, sizes: '96x96', type: 'image/png' }, 
+                        { src: t.img, sizes: '512x512', type: 'image/png' }
+                    ] 
+                });
+                
+                // 直接audioオブジェクトを操作して、スリープ復帰時の無音バグを防ぐ
+                navigator.mediaSession.setActionHandler('play', () => { audio.play().catch(e => console.warn(e)); }); 
+                navigator.mediaSession.setActionHandler('pause', () => { audio.pause(); });
                 navigator.mediaSession.setActionHandler('previoustrack', () => forcePrevTrack()); 
                 navigator.mediaSession.setActionHandler('nexttrack', () => forceNextTrack());
+
+                // ★ 追加：ロック画面のシークバーを動かした時の処理
+                navigator.mediaSession.setActionHandler('seekto', (details) => {
+                    if (details.fastSeek && 'fastSeek' in audio) {
+                        audio.fastSeek(details.seekTime);
+                    } else {
+                        audio.currentTime = details.seekTime;
+                    }
+                    updatePositionState(); // 動かした後の位置を再同期
+                });
             }
         }
 
