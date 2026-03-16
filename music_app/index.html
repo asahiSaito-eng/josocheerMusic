@@ -77,6 +77,15 @@
             backdrop-filter: blur(40px);
             -webkit-backdrop-filter: blur(40px);
         }
+        /* ドラッグ時の点滅・残像対策 */
+        .sortable-ghost {
+            opacity: 0 !important; /* 元あった場所の残像を完全に透明にする */
+        }
+        .sortable-drag {
+            opacity: 1 !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7) !important; /* 指に追従する要素に影をつけて浮かせる */
+            background-color: rgba(20, 20, 20, 0.95) !important; /* 背景が透けないように少し濃くする */
+        }
     </style>
 </head>
 <body class="flex flex-col">
@@ -610,10 +619,28 @@
                 container.appendChild(div);
             });
             if (isPlaylistEditing) {
-                playlistSortable = new Sortable(container, { handle: '.drag-handle', animation: 200, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', onEnd: function (evt) { const ni = evt.newIndex; const oi = evt.oldIndex; if(oi === ni) return; const movedItem = p.tracks.splice(oi, 1)[0]; p.tracks.splice(ni, 0, movedItem); saveData(); } });
+                playlistSortable = new Sortable(container, { 
+                    handle: '.drag-handle', 
+                    animation: 200, 
+                    ghostClass: 'sortable-ghost', 
+                    dragClass: 'sortable-drag', 
+                    
+                    // 【変更】スクロール感度の改善と点滅対策
+                    scroll: true,
+                    scrollSensitivity: 120, // 判定エリアを60から120に拡大
+                    scrollSpeed: 25,        // スクロール速度を15から25にアップ
+                    forceFallback: true,
+                    fallbackOnBody: true,   // 【追加】ドラッグ中の要素を独立させてチラつきを防ぐ
+                    
+                    onEnd: function (evt) { 
+                        // （中略：並び替えの処理）
+                        saveData(); 
+                    } 
+                });
                 container.innerHTML += `<div class="mt-8 flex justify-center pb-8"><button onclick="openModal('modal-delete-playlist')" class="text-red-500 font-bold py-3 px-8 bg-red-500/10 rounded-xl active:bg-red-500/20 transition-colors">プレイリストを削除</button></div>`;
             }
         }
+
         function animateAndRemoveTrack(plId, index, elementId) {
             const el = document.getElementById(elementId);
             if (el) { el.firstElementChild.classList.add('slide-out-left'); setTimeout(() => removeTrackFromPlaylist(plId, index), 300); } 
@@ -804,6 +831,7 @@
             const spacer = document.createElement('div');
             spacer.className = "h-40";
             container.appendChild(spacer);
+            
         }
 
         function updateLyricsUI(currentTime) {
@@ -943,24 +971,29 @@
                 if(!t) return;
 
                 const isActive = (i === currentQueueIdx); 
-                const div = document.createElement('div'); 
-                div.id = `queue-item-${i}`;
-                div.className = `flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer transition-all ${isActive ? 'bg-white/10 border-l-4 border-red-500' : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'}`;
                 
-                div.innerHTML = `
-                    <div class="w-10 h-10 relative flex-shrink-0" onclick="playTrackFromQueue(${i})">
-                        <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
-                        ${isActive ? `<div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center"><i class="fas fa-volume-up text-white text-xs"></i></div>` : ''}
-                    </div>
-                    <div class="flex-1 min-w-0" onclick="playTrackFromQueue(${i})">
-                        <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
-                        <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
-                    </div>
-                    <div class="w-10 h-10 flex items-center justify-center text-white/40 cursor-grab queue-drag-handle shrink-0 hover:text-white transition-colors">
-                        <i class="fas fa-bars"></i>
+                // 【変更】外側のラッパーを作成（ここにはtransitionを付けないことでスムーズに動く！）
+                const wrapper = document.createElement('div'); 
+                wrapper.id = `queue-item-${i}`;
+                wrapper.className = "mb-1"; // アイテム間の余白
+                
+                // 【変更】内側の要素にデザインやクリックイベントをまとめる
+                wrapper.innerHTML = `
+                    <div class="flex items-center gap-4 py-3 px-3 rounded-xl cursor-pointer ${isActive ? 'bg-white/10 border-l-4 border-red-500' : 'hover:bg-white/5 active:bg-white/10 border-l-4 border-transparent'}">
+                        <div class="w-10 h-10 relative flex-shrink-0" onclick="playTrackFromQueue(${i})">
+                            <img src="${t.img}" class="w-full h-full rounded shadow-md object-cover" onerror="this.src='https://via.placeholder.com/100x100.png?text=JOSO';">
+                            ${isActive ? `<div class="absolute inset-0 bg-black/40 rounded flex items-center justify-center"><i class="fas fa-volume-up text-white text-xs"></i></div>` : ''}
+                        </div>
+                        <div class="flex-1 min-w-0" onclick="playTrackFromQueue(${i})">
+                            <div class="text-sm font-semibold truncate ${isActive ? 'text-white' : 'text-white/80'}">${t.title}</div>
+                            <div class="text-[11px] truncate ${isActive ? 'text-white/70' : 'text-white/40'}">${t.artist}</div>
+                        </div>
+                        <div class="w-10 h-10 flex items-center justify-center text-white/40 cursor-grab queue-drag-handle shrink-0 hover:text-white transition-colors">
+                            <i class="fas fa-bars"></i>
+                        </div>
                     </div>
                 `;
-                container.appendChild(div);
+                container.appendChild(wrapper);
             });
 
             if (currentQueueIdx !== -1) { 
@@ -973,11 +1006,18 @@
             if(queueSortable) {
                 queueSortable.destroy();
             }
+            
+            // プレイリストと全く同じ至高の設定
             queueSortable = new Sortable(container, { 
                 handle: '.queue-drag-handle', 
                 animation: 200, 
                 ghostClass: 'sortable-ghost', 
                 dragClass: 'sortable-drag', 
+                scroll: true,
+                scrollSensitivity: 120,
+                scrollSpeed: 25,
+                forceFallback: true,
+                fallbackOnBody: true,
                 onEnd: function (evt) { 
                     const ni = evt.newIndex; 
                     const oi = evt.oldIndex; 
@@ -1045,7 +1085,15 @@
 
             function addVerticalSwipeListener(element, onSwipeDown) {
                 let sY = 0, sX = 0, isT = false;
-                element.addEventListener('touchstart', e => { sY = e.touches[0].clientY; sX = e.touches[0].clientX; isT = true; }, { passive: true });
+                element.addEventListener('touchstart', e => { 
+                    // 【追加】ドラッグ用のハンドルを触っている時はスワイプ判定を除外
+                    if (e.target.closest('.queue-drag-handle') || e.target.closest('.drag-handle')) {
+                        isT = false;
+                        return;
+                    }
+                    sY = e.touches[0].clientY; sX = e.touches[0].clientX; isT = true; 
+                }, { passive: true });
+                
                 element.addEventListener('touchmove', e => {
                     if (!isT) return; const cY = e.touches[0].clientY, cX = e.touches[0].clientX;
                     if (Math.abs(cX - sX) > Math.abs(cY - sY)) return;
