@@ -157,7 +157,10 @@
                 <input type="file" id="edit-playlist-cover-input" accept="image/*" class="hidden" onchange="processImageSelection(event, updateCurrentPlaylistCover)">
                 
                 <h1 id="detail-playlist-title" class="text-2xl font-bold mb-2 text-center px-4 w-full truncate">Playlist Name</h1>
-                <div class="flex gap-4 w-full mt-4" id="playlist-controls">
+                <div class="flex gap-3 w-full mt-4" id="playlist-controls">
+                    <button onclick="playPlaylistShuffled()" class="w-12 bg-white/10 py-3 rounded-xl flex justify-center items-center active:bg-white/20 transition-colors shrink-0">
+                        <i class="fas fa-random"></i>
+                    </button>   
                     <button onclick="playPlaylist()" class="flex-1 bg-white/10 py-3 rounded-xl font-bold flex justify-center items-center gap-2 active:bg-white/20 transition-colors">
                         <i class="fas fa-play"></i> 再生
                     </button>
@@ -297,9 +300,12 @@
                 
                 <div class="flex items-center gap-2 shrink-0">
                     <div id="loop-indicator" class="text-[9px] text-red-500 font-bold opacity-0 transition-opacity text-right leading-tight whitespace-nowrap">LOOP<br>ACTIVE</div>
-                    <button id="btn-favorite" onclick="toggleFavoriteCurrent()" class="text-2xl text-white/70 transition-all active:scale-75 w-10 h-10 flex items-center justify-center shrink-0">
-                        <i class="far fa-heart"></i>
-                    </button>
+                        <button id="btn-shuffle" onclick="toggleShuffle()" class="text-xl text-white/70 transition-all active:scale-75 w-10 h-10 flex items-center justify-center shrink-0">
+                            <i class="fas fa-random"></i>
+                        </button>
+                        <button id="btn-favorite" onclick="toggleFavoriteCurrent()" class="text-2xl text-white/70 transition-all active:scale-75 w-10 h-10 flex items-center justify-center shrink-0">
+                            <i class="far fa-heart"></i>
+                        </button>
                 </div>
                 
             </div>
@@ -412,6 +418,11 @@
         // 再生キューの状態管理
         let playQueue = [];
         let currentQueueIdx = -1;
+
+        //シャッフル用変数
+        let isShuffle = false;
+        let originalQueue = []; 
+        
         
         let currentIdx = -1; // 既存のUI更新用（トラック自体の絶対インデックス）
         let currentTrack = null;
@@ -438,7 +449,8 @@
         let currentLyricIndex = -1;
 
         // --- 初期設定 ---
-        playQueue = tracks.map(t => t.id); // 初期起動時はすべての曲をキューにセット
+        originalQueue = tracks.map(t => t.id);
+        playQueue = [...originalQueue]; // 初期起動時はすべての曲をキューにセット
 
         function saveData() {
             try {
@@ -650,6 +662,97 @@
         function confirmDeletePlaylist() { if(!currentEditingPlaylistId) return; playlists = playlists.filter(x => x.id !== currentEditingPlaylistId); saveData(); closeModal('modal-delete-playlist'); closeView('view-playlist-detail'); renderPlaylists(); }
         function playPlaylist() { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks.length > 0) { playContextTrack(p.tracks[0], p.tracks); } }
         function playPlaylistTrack(idxInPl) { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks[idxInPl]) { playContextTrack(p.tracks[idxInPl], p.tracks); } }
+        // 既存の playContextTrack をシャッフル対応に書き換え
+        function playContextTrack(trackId, contextIds, forceShuffle = false) {
+            if (!contextIds || contextIds.length === 0) return;
+            originalQueue = [...contextIds];
+            
+            if (forceShuffle) {
+                isShuffle = true;
+                updateShuffleUI();
+            }
+
+            if (isShuffle) {
+                // 選択された曲以外をシャッフルし、先頭に選択された曲を配置する
+                let pool = contextIds.filter(id => id !== trackId);
+                pool = shuffleArray(pool);
+                playQueue = [trackId, ...pool];
+            } else {
+                playQueue = [...contextIds];
+            }
+            
+            const qIdx = playQueue.indexOf(trackId);
+            playTrackFromQueue(qIdx !== -1 ? qIdx : 0);
+            toggleFullPlayer(true);
+        }
+
+        // プレイリスト詳細画面のシャッフル再生ボタン用
+        function playPlaylistShuffled() {
+            if(!currentEditingPlaylistId) return;
+            const p = playlists.find(x => x.id === currentEditingPlaylistId);
+            if(p && p.tracks.length > 0) {
+                // プレイリストの中からランダムに1曲選んでスタート
+                const randomTrackId = p.tracks[Math.floor(Math.random() * p.tracks.length)];
+                playContextTrack(randomTrackId, p.tracks, true);
+            }
+        }
+
+        // フルプレイヤー画面のシャッフル切り替えボタン用
+        function toggleShuffle() {
+            isShuffle = !isShuffle;
+            updateShuffleUI();
+            
+            if (!currentTrack) return;
+
+            if (isShuffle) {
+                // 現在の曲を先頭にして、残りのキューをシャッフル
+                let pool = playQueue.filter(id => id !== currentTrack.id);
+                pool = shuffleArray(pool);
+                playQueue = [currentTrack.id, ...pool];
+                currentQueueIdx = 0;
+            } else {
+                // オリジナルの再生順に戻す
+                if (originalQueue.length > 0) {
+                    playQueue = [...originalQueue];
+                    currentQueueIdx = playQueue.indexOf(currentTrack.id);
+                }
+            }
+            
+            // キュー画面が開いている場合は表示を更新
+            const queueView = document.getElementById('queue-view');
+            if (queueView.style.transform === "translateY(0px)" || queueView.style.transform === "translateY(0)") {
+                renderQueueList();
+            }
+        }
+
+        // 配列をシャッフルするヘルパー関数 (純粋な曲単位の完全ランダム版)
+        function shuffleArray(array) {
+            let arr = [...array];
+
+            // 暗号論的疑似乱数を用いた強力なシャッフル (Web Crypto API)
+            const randomBuffer = new Uint32Array(1);
+            for (let i = arr.length - 1; i > 0; i--) {
+                window.crypto.getRandomValues(randomBuffer);
+                const j = randomBuffer[0] % (i + 1);
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+
+            return arr;
+        }
+
+        // シャッフルボタンの見た目を更新
+        function updateShuffleUI() {
+            const btn = document.getElementById('btn-shuffle');
+            if(btn) {
+                if(isShuffle) {
+                    btn.classList.add('text-red-500');
+                    btn.classList.remove('text-white/70');
+                } else {
+                    btn.classList.remove('text-red-500');
+                    btn.classList.add('text-white/70');
+                }
+            }
+        }
         function openTrackSelector() { renderTrackSelector(); openModal('modal-track-selector'); }
         function renderTrackSelector() {
             const p = playlists.find(x => x.id === currentEditingPlaylistId); if(!p) return;
