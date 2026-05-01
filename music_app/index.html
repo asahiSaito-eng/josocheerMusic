@@ -607,8 +607,11 @@
             const p = playlists.find(x => x.id === plId); if(!p) return;
             document.getElementById('detail-playlist-title').innerText = p.name; renderPlaylistDetailList(p); openView('view-playlist-detail');
         }
+       
         function renderPlaylistDetailList(p) {
-            const container = document.getElementById('playlist-detail-list'); container.innerHTML = '';
+            const container = document.getElementById('playlist-detail-list'); 
+            container.innerHTML = '';
+            
             if (playlistSortable) { playlistSortable.destroy(); playlistSortable = null; }
             const coverInner = document.getElementById('detail-cover-inner');
             if (p.coverImage) coverInner.innerHTML = `<img src="${p.coverImage}" class="w-full h-full object-cover">`;
@@ -620,6 +623,7 @@
                 if(isPlaylistEditing) container.innerHTML += `<div class="mt-12 flex justify-center pb-12"><button onclick="openModal('modal-delete-playlist')" class="text-red-500 font-bold py-3 px-8 bg-red-500/10 rounded-xl active:bg-red-500/20 transition-colors">プレイリストを削除</button></div>`;
                 return;
             }
+
             p.tracks.forEach((trackId, index) => {
                 const t = tracks.find(x => x.id === trackId); if(!t) return;
                 const div = document.createElement('div'); div.className = "border-b border-white/5 overflow-hidden"; div.id = `playlist-item-${index}`;
@@ -630,22 +634,16 @@
                 }
                 container.appendChild(div);
             });
+            
             if (isPlaylistEditing) {
                 playlistSortable = new Sortable(container, { 
-                    handle: '.drag-handle', 
-                    animation: 200, 
-                    ghostClass: 'sortable-ghost', 
-                    dragClass: 'sortable-drag', 
-                    
-                    // 【変更】スクロール感度の改善と点滅対策
-                    scroll: true,
-                    scrollSensitivity: 120, // 判定エリアを60から120に拡大
-                    scrollSpeed: 25,        // スクロール速度を15から25にアップ
-                    forceFallback: true,
-                    fallbackOnBody: true,   // 【追加】ドラッグ中の要素を独立させてチラつきを防ぐ
-                    
+                    handle: '.drag-handle', animation: 200, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', 
+                    scroll: true, scrollSensitivity: 120, scrollSpeed: 25, forceFallback: true, fallbackOnBody: true,   
                     onEnd: function (evt) { 
-                        // （中略：並び替えの処理）
+                        const oi = evt.oldIndex; const ni = evt.newIndex;
+                        if(oi === ni) return;
+                        const moved = p.tracks.splice(oi, 1)[0];
+                        p.tracks.splice(ni, 0, moved);
                         saveData(); 
                     } 
                 });
@@ -661,7 +659,24 @@
         function removeTrackFromPlaylist(plId, index) { const p = playlists.find(x => x.id === plId); if(p) { p.tracks.splice(index, 1); saveData(); renderPlaylistDetailList(p); renderPlaylists(); } }
         function confirmDeletePlaylist() { if(!currentEditingPlaylistId) return; playlists = playlists.filter(x => x.id !== currentEditingPlaylistId); saveData(); closeModal('modal-delete-playlist'); closeView('view-playlist-detail'); renderPlaylists(); }
         function playPlaylist() { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks.length > 0) { playContextTrack(p.tracks[0], p.tracks); } }
-        function playPlaylistTrack(idxInPl) { if(!currentEditingPlaylistId) return; const p = playlists.find(x => x.id === currentEditingPlaylistId); if(p && p.tracks[idxInPl]) { playContextTrack(p.tracks[idxInPl], p.tracks); } }
+        function playPlaylistTrack(idxInPl) { 
+             if(!currentEditingPlaylistId) return; 
+                if (typeof isShuffle !== 'undefined' && isShuffle === true) {
+                    isShuffle = false; // シャッフル状態をOFFにする
+                    const shuffleBtn = document.getElementById('btn-shuffle');
+                    if (shuffleBtn) {
+                        // シャッフルONの時の色（例: text-blue-500 など）を外して、元の色に戻す
+                        shuffleBtn.classList.remove('text-blue-500'); 
+                        shuffleBtn.classList.add('text-white/70');
+                    }
+                }
+
+                const p = playlists.find(x => x.id === currentEditingPlaylistId); 
+                if(p && p.tracks[idxInPl]) { 
+                    playContextTrack(p.tracks[idxInPl], p.tracks); 
+                } 
+        }
+
         // 既存の playContextTrack をシャッフル対応に書き換え
         function playContextTrack(trackId, contextIds, forceShuffle = false) {
             if (!contextIds || contextIds.length === 0) return;
@@ -691,7 +706,6 @@
             if(!currentEditingPlaylistId) return;
             const p = playlists.find(x => x.id === currentEditingPlaylistId);
             if(p && p.tracks.length > 0) {
-                // プレイリストの中からランダムに1曲選んでスタート
                 const randomTrackId = p.tracks[Math.floor(Math.random() * p.tracks.length)];
                 playContextTrack(randomTrackId, p.tracks, true);
             }
@@ -789,7 +803,6 @@
                 container.appendChild(btn);
             });
         }   
-        
         // ====== プレイヤーコア ======
 
         // 再生コンテキスト（リスト）に基づくキューの更新と再生
