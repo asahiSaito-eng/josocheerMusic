@@ -788,14 +788,34 @@
                 btn.onclick = () => { if (!p.tracks.includes(selectedTrackIdForAction)) { p.tracks.push(selectedTrackIdForAction); saveData(); } closeModal('modal-playlist-select'); };
                 container.appendChild(btn);
             });
-        }
-
+        }   
+        
         // ====== プレイヤーコア ======
 
         // 再生コンテキスト（リスト）に基づくキューの更新と再生
-        function playContextTrack(trackId, contextIds) {
+        function playContextTrack(trackId, contextIds, forceShuffle = false) {
             if (!contextIds || contextIds.length === 0) return;
-            playQueue = [...contextIds];
+            
+            // 元の再生リスト順を保存（シャッフル解除時に戻すため）
+            originalQueue = [...contextIds];
+
+            // プレイリスト等のシャッフル再生ボタンから呼ばれた場合
+            if (forceShuffle) {
+                isShuffle = true;
+                updateShuffleUI();
+            }
+
+            if (isShuffle) {
+                // シャッフルON：選択された曲以外をシャッフルし、先頭に選択曲を配置
+                let pool = contextIds.filter(id => id !== trackId);
+                pool = shuffleArray(pool);
+                playQueue = [trackId, ...pool];
+            } else {
+                // シャッフルOFF：元の順序のまま
+                playQueue = [...contextIds];
+            }
+            
+            // キュー内のインデックスを取得（シャッフル時は必ず0になります）
             const qIdx = playQueue.indexOf(trackId);
             playTrackFromQueue(qIdx !== -1 ? qIdx : 0);
             toggleFullPlayer(true);
@@ -1268,3 +1288,5 @@
     </script>
 </body>
 </html>
+
+    
